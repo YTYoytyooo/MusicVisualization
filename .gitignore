@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+.env/
+
+# IDE
+.vscode/
+.idea/
+
+# Data / audio files
+*.mp3
+*.flac
+*.wav
+*.mp4
+
+# Model files (建议外置下载)
+*.pth
+models/
+
+# Numpy cache
+*.npy
+
+# Outputs
+outputs/
+results/
+
+# System
+.DS_Store
