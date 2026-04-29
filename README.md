@@ -4,28 +4,6 @@ A system that transforms audio into dynamic visual output based on emotion recog
 
 ---
 
-## Overview
-
-This project analyzes music signals and generates corresponding visualizations in video form. It combines:
-
-* Audio feature extraction (spectral and rhythmic features)
-* Emotion modeling using a CLAP-based approach
-* Decision-making via Monte Carlo Tree Search (MCTS)
-* Frame-by-frame visual rendering
-* Final video synthesis
-
----
-
-## Features
-
-* Supports multiple audio formats (`.mp3`, `.wav`, `.flac`)
-* Batch processing of multiple input files
-* Emotion-driven visualization
-* Automatic model loading (Hugging Face)
-* Fallback mode when FFmpeg is unavailable
-
----
-
 ## Installation
 
 ### 1.Rrepository
