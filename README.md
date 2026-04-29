@@ -1,6 +1,43 @@
-## Dependencies
+# Music Visualization
 
-### 1. Python packages
+A system that transforms audio into dynamic visual output based on emotion recognition and audio features.
+
+---
+
+## Overview
+
+This project analyzes music signals and generates corresponding visualizations in video form. It combines:
+
+* Audio feature extraction (spectral and rhythmic features)
+* Emotion modeling using a CLAP-based approach
+* Decision-making via Monte Carlo Tree Search (MCTS)
+* Frame-by-frame visual rendering
+* Final video synthesis
+
+---
+
+## Features
+
+* Supports multiple audio formats (`.mp3`, `.wav`, `.flac`)
+* Batch processing of multiple input files
+* Emotion-driven visualization
+* Automatic model loading (Hugging Face)
+* Fallback mode when FFmpeg is unavailable
+
+---
+
+## Installation
+
+### 1.Rrepository
+
+```bash
+git clone https://github.com/YTYoytyooo/MusicVisualization.git
+cd MusicVisualization
+```
+
+---
+
+### 2. Requirements
 
 ```bash
 pip install -r requirements.txt
@@ -8,17 +45,19 @@ pip install -r requirements.txt
 
 ---
 
-### 2. FFmpeg (strongly recommended)
+## Dependencies
 
-This project uses FFmpeg for audio decoding and final video encoding.
+### FFmpeg (strongly recommended)
 
-## With FFmpeg (recommended)
+FFmpeg is used for audio decoding and final video encoding.
 
-If FFmpeg is installed, the program will generate a final `.mp4` video file directly.
+#### With FFmpeg (recommended)
 
-Install FFmpeg:
+The program outputs a final `.mp4` video.
 
-* Windows: download from https://ffmpeg.org and add to PATH
+Install:
+
+* Windows: https://ffmpeg.org (add to PATH)
 * macOS:
 
 ```bash
@@ -31,50 +70,86 @@ brew install ffmpeg
 sudo apt install ffmpeg
 ```
 
-Verify installation:
+---
 
-```bash
-ffmpeg -version
-```
+#### Without FFmpeg (fallback mode)
 
+If FFmpeg is not installed, the program will still run but outputs:
 
-## Without FFmpeg (fallback mode)
-
-If FFmpeg is not available, the program will still run, but outputs will be separated:
-
-* `.avi` (video without proper encoding)
-* `.mp3` (audio track)
-
-These files can be manually merged later using FFmpeg.
-
+* `.avi` (video)
+* `.mp3` (audio)
 
 ---
 
-### 3. Hugging Face (optional)
+### Hugging Face (optional)
 
-This project uses a CLAP-based model from Hugging Face for audio understanding.
+This project uses a CLAP-based model from Hugging Face.
 
-No login is required to run the project. However, unauthenticated requests may be slower and subject to rate limits.
+No login is required, but authentication improves speed and avoids rate limits.
 
-## Optional: login for better performance
+Optional setup:
 
 ```bash
 pip install huggingface_hub
 hf auth login
 ```
 
-Or set your token manually:
+Notes:
+
+* Model downloads automatically on first run
+* Authentication is optional but recommended
+
+---
+
+## Usage
+
+### Basic usage
 
 ```bash
-export HF_TOKEN=your_token_here   # Linux / macOS
-setx HF_TOKEN your_token_here     # Windows
+python main.py input1.mp3 input2.wav input3.flac
 ```
 
-With authentication, model downloads are faster and more reliable.
+### Specify model file (optional)
 
-## Notes
+```bash
+python main.py input1.wav input2.mp3 --model emotion_model.pth
+```
 
-* The model will be automatically downloaded on first run
-* No manual setup is required unless you encounter rate limits
+---
 
+### Notes
 
+* Multiple input files are supported
+* Each input file generates a corresponding output video
+* Output files are saved in the current directory
+* Supported formats: `.mp3`, `.wav`, `.flac`
+
+---
+
+## Project Structure
+
+```text
+main.py                  # Entry point
+feature_extraction.py    # Audio analysis
+emotion_model.py         # Emotion prediction
+mcts.py                  # Decision algorithm
+renderer.py              # Visualization rendering
+requirements.txt         # Dependencies
+README.md                # Documentation
+```
+
+---
+
+## How It Works
+
+1. Audio is loaded and processed into features
+2. CLAP-based model estimates emotional characteristics
+3. MCTS determines visual transitions and states
+4. Renderer generates frames based on emotion and structure
+5. Frames are encoded into a video file
+
+---
+
+## License
+
+MIT License
