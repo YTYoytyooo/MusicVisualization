@@ -59,7 +59,7 @@ If FFmpeg is not installed, the program will still run but outputs:
 
 ---
 
-### Hugging Face (optional)
+### Hugging Face (optional, but you need at least to be able to access this website if you are in China mainland)
 
 This project uses a CLAP-based model from Hugging Face.
 
