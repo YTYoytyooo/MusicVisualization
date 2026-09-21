@@ -185,7 +185,8 @@ def _merge_audio_video(video_path: str, audio_path: str, output_path: str) -> No
 
 # ── 主流程 ─────────────────────────────────────────────────────
 
-def main(input_path: str, output_path: str, model_path: str = 'emotion_model.pth') -> None:
+def main(input_path: str, output_path: str, model_path: str = 'emotion_model.pth',
+         test_output: bool = False, overlay_font: Optional[str] = None) -> None:
     # ── 1. 加载音频 ───────────────────────────────────────────────
     print(f"[1/6] Loading audio: {input_path}")
     y, sr = load_audio(input_path)          # y: (N_samples,) float32，sr: 22050
@@ -235,6 +236,14 @@ def main(input_path: str, output_path: str, model_path: str = 'emotion_model.pth
     emotion_states = iface.predict_sequence(clap_embeddings)
     print(f"      Predicted {len(emotion_states)} emotion states")
 
+    prediction_overlay = None
+    if test_output:
+        from prediction_overlay import PredictionOverlay
+        prediction_overlay = PredictionOverlay(
+            audio_stem, duration, emotion_states,
+            frame_duration=FRAME_DUR, font_path=overlay_font,
+        )
+
     # ── 5. MCTS 视觉参数搜索 ──────────────────────────────────────
     print("[5/6] MCTS visual parameter search...")
     mcts = MCTS(n_iter=200, branching=5)
@@ -268,7 +277,8 @@ def main(input_path: str, output_path: str, model_path: str = 'emotion_model.pth
     total_video_frames = int(duration * FPS)         # 总视频帧数
     samples_per_video_frame = max(1, sr // FPS)      # 每视频帧对应的音频样本数（约 735）
 
-    renderer = VideoRenderer(tmp_video, fps=FPS)
+    renderer = VideoRenderer(tmp_video, fps=FPS,
+                             prediction_overlay=prediction_overlay)
 
     for frame_idx in range(total_video_frames):
         t = frame_idx / FPS  # 当前帧对应的时间（秒）
@@ -329,6 +339,11 @@ if __name__ == '__main__':
     parser.add_argument('--model', default='emotion_model.pth',
                         help='Path to emotion model weights')
 
+    parser.add_argument('--test-output', action='store_true',
+                        help='Show song name, playback time and predicted V-A trajectory')
+    parser.add_argument('--overlay-font', default=None,
+                        help='Optional TTF/TTC/OTF font supporting the song name')
+
     args = parser.parse_args()
 
     for input_file in args.inputs:
@@ -338,13 +353,14 @@ if __name__ == '__main__':
 
         # 原始输出路径（同目录，同名.mp4）
         base = os.path.splitext(input_file)[0]
-        output_file = base + '.mp4'
+        output_base = base + '_test' if args.test_output else base
+        output_file = output_base + '.mp4'
 
         # === 自动重命名避免覆盖 ===
         i = 1
         while os.path.exists(output_file):
-            output_file = base + f'_{i}.mp4'
+            output_file = output_base + f'_{i}.mp4'
             i += 1
 
         print(f"Processing: {input_file} -> {output_file}")
-        main(input_file, output_file, args.model)
+        main(input_file, output_file, args.model, args.test_output, args.overlay_font)

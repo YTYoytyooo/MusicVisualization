@@ -93,6 +93,50 @@ python main.py input1.mp3 input2.wav input3.flac
 python main.py input1.wav input2.mp3 --model emotion_model.pth
 ```
 
+### Test videos: predicted V–A trajectory, song name and playback clock
+
+```bash
+python main.py "your-song.mp3" --test-output
+python main.py "song-a.wav" "song-b.mp3" --model emotion_model.pth --test-output
+```
+
+Test outputs are named `your-song_test.mp4` alongside the input (with a numeric
+suffix if necessary). Without `--test-output`, the existing clean video output
+is unchanged. This option is separate from the legacy `renderer.TEST` particle
+physics debug switch.
+
+- Header: input filename without extension, plus audio playback time / duration
+  in `mm:ss.mmm` (not wall-clock time).
+- Right panel: fixed −1…+1 axes, horizontal valence / vertical arousal, cumulative
+  model-prediction trajectory up to the current sample, highlighted last 10 seconds,
+  and a current-position dot with numeric V/A values.
+- Synchronization: video time is `frame_index / fps`; prediction `i` is assigned
+  `i * FRAME_DUR` by the existing pipeline. Hold the latest available prediction
+  between samples; do not interpolate predictions or draw future trajectory points.
+  The final prediction is held through any short audio remainder.
+- These are model estimates, not human ground truth. Inference remains offline:
+  CLAP uses 2-second windows, including audio after each window's starting timestamp.
+  A synchronized display does not imply streaming/causal emotion recognition.
+- Chinese filenames use a system CJK font (Microsoft YaHei on Windows). For other
+  languages/systems, supply a font supporting the title:
+
+```bash
+python main.py "歌曲.mp3" --test-output --overlay-font "C:/Windows/Fonts/msyh.ttc"
+```
+
+Very long titles are truncated to fit the header; the source filename is unchanged.
+The overlay adds no model downloads and does not change training, MCTS or audio.
+
+Verification (no model download):
+
+```bash
+python -m unittest discover -s tests -v
+python tests/preview_test_output.py --output-dir ../test-output-preview
+```
+
+The preview command uses a synthetic tone and synthetic V/A values solely to test
+display, timing and encoding; it is not a music-emotion evaluation.
+
 ---
 
 ### Notes
@@ -119,6 +163,34 @@ README.md                # Documentation
 ---
 
 ## How It Works
+
+```mermaid
+flowchart TD
+    A["Input audio / filename"] --> B["Load mono audio · 22050 Hz"]
+    B --> C["Librosa: frame features · 0.1 s; BPM / beats / duration"]
+    B --> D["Resample 48000 Hz → CLAP · 2 s windows / 0.1 s hop"]
+    D --> E["512-D embeddings / .npy cache"]
+    C -. "only when no checkpoint exists" .-> F["Heuristic pseudo-labels → train adapter / save checkpoint"]
+    E -. "training inputs" .-> F
+    F --> G["Load trained BiLSTM adapter"]
+    H["Existing checkpoint"] --> G
+    E --> I["LayerNorm → BiLSTM 128×2 → 256→64→5 / Tanh"]
+    G --> I
+    I --> J["Valence / Arousal / Energy / Tension / Brightness"]
+    J -->|"V/A only"| K["MCTS · every 0.5 s → 8 visual parameters"]
+    K --> L["Interpolate visual state → render at 30 FPS"]
+    C -->|"waveform / beat timing"| L
+    L --> M["Gradient / trails / particles / waveform"]
+    J -->|"V/A at i × 0.1 s"| N["Optional --test-output HUD"]
+    A -->|"filename"| N
+    C -->|"duration"| N
+    O["Media clock: frame index / FPS"] --> N
+    O --> L
+    M --> P["Compose video frame"]
+    N --> P
+    P --> Q["Silent AVI + WAV → FFmpeg → MP4"]
+    B -->|"audio"| Q
+```
 
 1. Audio is loaded and processed into features
 2. CLAP-based model estimates emotional characteristics

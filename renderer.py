@@ -351,11 +351,13 @@ class VideoRenderer:
     """
 
     def __init__(self, output_video_path: str, fps: int = FPS,
-                 width: int = WIDTH, height: int = HEIGHT):
+                 width: int = WIDTH, height: int = HEIGHT,
+                 prediction_overlay=None):
         self.W = width
         self.H = height
         self.fps = fps
         self.frame_idx = 0
+        self.prediction_overlay = prediction_overlay
 
         # mp4v 编码器：生成 .avi 临时文件，后续由 ffmpeg 合并音频并转为 .mp4
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -567,6 +569,10 @@ class VideoRenderer:
                 frame, visual_state, self.particles)  # test
             self._render_vector_field(frame, self.particles)  # test
             self._render_velocity(frame, self.particles)  # test
+
+        # Test HUD uses exactly the same media clock as main.py, not wall time.
+        if self.prediction_overlay is not None:
+            self.prediction_overlay.draw(frame, self.frame_idx / self.fps)
 
         self.frame_idx += 1
         return frame
