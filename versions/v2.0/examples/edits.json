@@ -1,0 +1,27 @@
+[
+  {
+    "id": "arousal-2s",
+    "layer": "emotion",
+    "field": "arousal",
+    "operation": "point_target",
+    "time_us": 2000000,
+    "value": 0.65,
+    "transition_in_us": 500000,
+    "transition_out_us": 500000,
+    "enabled": true,
+    "note": "2秒处提高唤醒度；前后各0.5秒过渡"
+  },
+  {
+    "id": "speed-interval",
+    "layer": "visual",
+    "field": "particle_speed",
+    "operation": "interval_set",
+    "start_us": 1000000,
+    "end_us": 3000000,
+    "value": 3,
+    "transition_in_us": 500000,
+    "transition_out_us": 500000,
+    "enabled": true,
+    "note": "视觉速度单独调整，不冒充模型预测"
+  }
+]

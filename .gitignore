@@ -1,32 +1,48 @@
-# Python
-__pycache__/
-*.pyc
-*.pyo
-
-# Virtual environment
-venv/
-.env/
-
-# IDE
+# Local environments and editor settings
+/venv/
+/.venv/
+/.claude/
+/.codex/
+/.agents/
+.env
+.env.*
 .vscode/
 .idea/
+__pycache__/
+*.py[cod]
+node_modules/
+.DS_Store
+Thumbs.db
 
-# Data / audio files
+# Local migrations, backups and private records
+/archive/
+/scripts/migrate-layout.ps1
+/scripts/adapt-layout.py
+/scripts/verify-layout.py
+
+# User music, models, caches, generated output and local tools
+/assets/audio/
+/data/*
+!/data/README.md
+/models/*
+!/models/README.md
+.runtime/
+.cache/
+.jobs/
+projects/
+outputs/
+validation-output/
 *.mp3
 *.flac
 *.wav
+*.ogg
+*.m4a
 *.mp4
-
-# Model files (建议外置下载)
+*.avi
+*.mov
 *.pth
-models/
-
-# Numpy cache
+*.pt
 *.npy
-
-# Outputs
-outputs/
-results/
-
-# System
-.DS_Store
+*.npz
+*.zip
+*.log

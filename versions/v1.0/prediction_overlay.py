@@ -3,6 +3,8 @@
 Coordinates use a 1280x720 design canvas and scale with the output frame.
 Prediction i belongs to the pipeline timestamp i * frame_duration. Values are
 held until the next prediction; no smoothing or future trajectory is displayed.
+Zoom bounds are calculated once from the full offline sequence, with real-value
+ticks and a full-range inset. Only display coordinates change, not predictions.
 """
 
 import os
@@ -45,6 +47,11 @@ class PredictionOverlay:
     WHITE = (245, 238, 225)
     CYAN = (235, 213, 96)
     ORANGE = (108, 180, 255)
+    MIN_ZOOM_SPAN = 0.1
+    HIGHLIGHT_SECONDS = 2.0
+    MAIN_RECT = (68, 82, 308, 322)
+    OVERVIEW_RECT = (228, 397, 316, 485)
+    FULL_BOUNDS = ((-1., 1.), (-1., 1.))
 
     def __init__(self, song_name, duration, emotion_states, frame_duration=0.1,
                  font_path=None):
@@ -61,8 +68,12 @@ class PredictionOverlay:
         self.duration = float(duration)
         self.frame_duration = float(frame_duration)
         self.times = np.arange(len(self.values)) * frame_duration
+        self.zoom_bounds = self._zoom_bounds(self.values)
         self.points = np.array([self.point_for(v, a) for v, a in self.values],
                                dtype=np.int32)
+        self.overview_points = np.array([
+            self._map_point(v, a, self.FULL_BOUNDS, self.OVERVIEW_RECT)
+            for v, a in self.values], dtype=np.int32)
         self.song_name = ' '.join(str(song_name).split()) or 'Untitled'
         self.title_max_width = 850
         font = _title_font(self.song_name, font_path)
@@ -77,28 +88,81 @@ class PredictionOverlay:
                                          fill=self.WHITE[::-1])
         self.header = np.array(header_image)[:, :, ::-1].copy()
         self._text(self.header, 'TEST OUTPUT / MODEL PREDICTION', (18, 65), 0.48)
-        self.panel = np.full((470, 340, 3), self.BACKGROUND, dtype=np.uint8)
+        self.panel = np.full((510, 340, 3), self.BACKGROUND, dtype=np.uint8)
         self._text(self.panel, 'VALENCE - AROUSAL', (18, 28), 0.65)
-        self._text(self.panel, 'Arousal', (52, 61), 0.48)
+        self._text(self.panel, 'ZOOMED VIEW / fixed per song', (18, 49), 0.43)
+        self._text(self.panel, 'Arousal', (68, 71), 0.43)
+        left, top, right, bottom = self.MAIN_RECT
+        (v_low, v_high), (a_low, a_high) = self.zoom_bounds
+        for value in np.linspace(v_low, v_high, 3):
+            x, _ = self.point_for(value, a_low)
+            cv2.line(self.panel, (x, top), (x, bottom), (76, 62, 46), 1)
+            label = f'{value:+.3f}'
+            width = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, .36, 1)[0][0]
+            self._text(self.panel, label, (min(x - width // 2, 335 - width), 342), .36)
+        for value in np.linspace(a_low, a_high, 3):
+            _, y = self.point_for(v_low, value)
+            cv2.line(self.panel, (left, y), (right, y), (76, 62, 46), 1)
+            self._text(self.panel, f'{value:+.3f}', (8, y + 4), .36)
+        self._text(self.panel, 'Valence', (152, 363), .43)
+        self._text(self.panel, 'FULL [-1, +1]', (222, 384), .36)
+        left, top, right, bottom = self.OVERVIEW_RECT
         for value in (-1, 0, 1):
-            x, y = self.point_for(value, value)
-            cv2.line(self.panel, (x, 86), (x, 328), (76, 62, 46), 1)
-            cv2.line(self.panel, (52, y), (294, y), (76, 62, 46), 1)
-            self._text(self.panel, f'{value:+d}', (x - 10, 351), 0.4)
-            self._text(self.panel, f'{value:+d}', (15, y + 5), 0.4)
-        self._text(self.panel, 'Valence', (126, 375), 0.48)
-        self._text(self.panel, 'History / recent 10s / current dot', (18, 445), 0.43)
-        self._text(self.panel, 'Estimate, not human ground truth', (18, 463), 0.43)
+            x, y = self._map_point(value, value, self.FULL_BOUNDS, self.OVERVIEW_RECT)
+            cv2.line(self.panel, (x, top), (x, bottom), (76, 62, 46), 1)
+            cv2.line(self.panel, (left, y), (right, y), (76, 62, 46), 1)
+        for value in (-1, 1):
+            x, y = self._map_point(value, value, self.FULL_BOUNDS, self.OVERVIEW_RECT)
+            self._text(self.panel, f'{value:+d}', (x - 8, 500), .32)
+            self._text(self.panel, f'{value:+d}', (206, y + 4), .32)
+        zoom_top_left = self._map_point(v_low, a_high, self.FULL_BOUNDS, self.OVERVIEW_RECT)
+        zoom_bottom_right = self._map_point(v_high, a_low, self.FULL_BOUNDS, self.OVERVIEW_RECT)
+        cv2.rectangle(self.panel, tuple(zoom_top_left), tuple(zoom_bottom_right), self.ORANGE, 1)
+        self._text(self.panel, 'Last 2s highlighted', (18, 465), .40)
+        self._text(self.panel, 'Earlier history: dim', (18, 482), .40)
+        self._text(self.panel, 'Prediction, not ground truth', (18, 503), .34)
 
     @staticmethod
     def _text(image, text, position, scale=0.55, color=None):
         cv2.putText(image, text, position, cv2.FONT_HERSHEY_SIMPLEX, scale,
                     color or PredictionOverlay.WHITE, 1, cv2.LINE_AA)
 
+    @classmethod
+    def _zoom_bounds(cls, values):
+        lows, highs = values.min(axis=0), values.max(axis=0)
+        # Equal units per pixel preserve V-A geometry. Leave 10% padding on
+        # each side, limit magnification to 20x, and never hide any samples.
+        span = min(2., max(cls.MIN_ZOOM_SPAN, float(max(highs - lows)) * 1.2))
+        bounds = []
+        for low, high in zip(lows, highs):
+            start = float(np.clip((low + high) / 2 - span / 2, -1., 1. - span))
+            bounds.append((start, min(1., start + span)))
+        return tuple(bounds)
+
     @staticmethod
-    def point_for(valence, arousal):
-        return np.rint([52 + (valence + 1) * 121,
-                        86 + (1 - arousal) * 121]).astype(np.int32)
+    def _map_point(valence, arousal, bounds, rect):
+        (v_low, v_high), (a_low, a_high) = bounds
+        left, top, right, bottom = rect
+        return np.rint([left + (valence - v_low) / (v_high - v_low) * (right - left),
+                        top + (a_high - arousal) / (a_high - a_low) * (bottom - top)]).astype(np.int32)
+
+    def point_for(self, valence, arousal):
+        return self._map_point(valence, arousal, self.zoom_bounds, self.MAIN_RECT)
+
+    def recent_start_at(self, time_seconds):
+        elapsed = float(np.clip(time_seconds, 0, self.duration))
+        cutoff = max(0., elapsed - self.HIGHLIGHT_SECONDS)
+        return int(np.searchsorted(self.times, cutoff - 1e-9, side='left'))
+
+    def _draw_trajectory(self, panel, points, index, recent_start, radius):
+        history = points[:index + 1]
+        if len(history) > 1:
+            cv2.polylines(panel, [history], False, (120, 105, 85), 1, cv2.LINE_AA)
+        recent = points[recent_start:index + 1]
+        if len(recent) > 1:
+            cv2.polylines(panel, [recent], False, self.CYAN, 2, cv2.LINE_AA)
+        cv2.circle(panel, tuple(points[index]), radius, self.ORANGE, -1, cv2.LINE_AA)
+        cv2.circle(panel, tuple(points[index]), radius + 2, self.WHITE, 1, cv2.LINE_AA)
 
     def sample_at(self, time_seconds):
         if not np.isfinite(time_seconds):
@@ -124,18 +188,12 @@ class PredictionOverlay:
                    (900, 32), 0.57, self.CYAN)
         self._text(header, 'AUDIO PLAYBACK TIME', (900, 62), 0.43)
         panel = self.panel.copy()
-        history = self.points[:index + 1]
-        if len(history) > 1:
-            cv2.polylines(panel, [history], False, (120, 105, 85), 1, cv2.LINE_AA)
-        recent_start = int(np.searchsorted(self.times, max(0, elapsed - 10)))
-        recent = self.points[recent_start:index + 1]
-        if len(recent) > 1:
-            cv2.polylines(panel, [recent], False, self.CYAN, 2, cv2.LINE_AA)
-        cv2.circle(panel, tuple(self.points[index]), 6, self.ORANGE, -1, cv2.LINE_AA)
-        cv2.circle(panel, tuple(self.points[index]), 8, self.WHITE, 1, cv2.LINE_AA)
-        self._text(panel, f'V {valence:+.3f}    A {arousal:+.3f}', (18, 402), 0.65)
-        self._text(panel, f'Sample {index} @ {self.times[index]:.3f}s (hold)',
-                   (18, 424), 0.40)
+        recent_start = self.recent_start_at(elapsed)
+        self._draw_trajectory(panel, self.points, index, recent_start, radius=5)
+        self._draw_trajectory(panel, self.overview_points, index, recent_start, radius=2)
+        self._text(panel, f'V {valence:+.3f}', (18, 400), .62)
+        self._text(panel, f'A {arousal:+.3f}', (18, 425), .62)
+        self._text(panel, f'Sample @ {self.times[index]:.3f}s', (18, 447), .40)
         self._paste(frame, header, 16, 16)
         self._paste(frame, panel, 924, 118)
         return frame

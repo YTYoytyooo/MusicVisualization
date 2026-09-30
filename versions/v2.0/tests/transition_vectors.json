@@ -1,0 +1,48 @@
+{
+  "duration_us": 1000000,
+  "base_edit": {
+    "id": "curve", "layer": "emotion", "field": "arousal",
+    "operation": "interval_set", "start_us": 400000, "end_us": 600000,
+    "transition_in_us": 400000, "transition_out_us": 400000, "value": 1
+  },
+  "weight_cases": [
+    {"name": "legacy default linear", "patch": {}, "times_us": [0, 100000, 200000, 300000, 400000, 600000, 700000, 800000, 900000, 1000000], "expected": [0, 0.25, 0.5, 0.75, 1, 1, 0.75, 0.5, 0.25, 0]},
+    {"name": "explicit linear", "patch": {"interpolation": "linear"}, "times_us": [100000, 300000, 900000], "expected": [0.25, 0.75, 0.25]},
+    {"name": "smoothstep", "patch": {"interpolation": "smoothstep"}, "times_us": [0, 100000, 200000, 300000, 400000, 600000, 700000, 800000, 900000, 1000000], "expected": [0, 0.15625, 0.5, 0.84375, 1, 1, 0.84375, 0.5, 0.15625, 0]},
+    {"name": "smootherstep", "patch": {"interpolation": "smootherstep"}, "times_us": [0, 100000, 200000, 300000, 400000, 600000, 700000, 800000, 900000, 1000000], "expected": [0, 0.103515625, 0.5, 0.896484375, 1, 1, 0.896484375, 0.5, 0.103515625, 0]},
+    {"name": "non-grid point", "patch": {"operation": "point_target", "time_us": 365123, "transition_in_us": 12344, "transition_out_us": 12344, "interpolation": "smootherstep"}, "times_us": [352779, 355865, 358951, 365123, 371295, 374381, 377467], "expected": [0, 0.103515625, 0.5, 1, 0.5, 0.103515625, 0]}
+  ],
+  "apply_cases": [
+    {"name": "offset smoothstep", "patch": {"operation": "interval_offset", "value": 0.4, "interpolation": "smoothstep"}, "times_us": [100000, 400000, 900000], "base_arousal": [0.2, 0.2, 0.2], "expected": [0.2625, 0.6, 0.2625]},
+    {"name": "disabled", "patch": {"enabled": false, "interpolation": "smootherstep"}, "times_us": [100000, 400000, 900000], "base_arousal": [0.2, -0.4, 0.6], "expected": [0.2, -0.4, 0.6]},
+    {"name": "target blend", "patch": {"value": 0.6, "interpolation": "smootherstep"}, "times_us": [100000, 200000, 400000], "base_arousal": [-0.2, -0.2, -0.2], "expected": [-0.1171875, 0.2, 0.6]}
+  ],
+  "visual_plan": {
+    "times_us": [0, 1000000],
+    "states": [
+      {"hue_base": 350, "hue_range": 60, "saturation": 0.8, "brightness": 0.5, "particle_count": 50, "particle_speed": 2, "field_turbulence": 0.3, "trail_length": 5},
+      {"hue_base": 10, "hue_range": 60, "saturation": 0.8, "brightness": 0.5, "particle_count": 51, "particle_speed": 2, "field_turbulence": 0.3, "trail_length": 6}
+    ]
+  },
+  "visual_samples": {
+    "times_us": [0, 250000, 500000, 750000, 1000000],
+    "hue_base": [350, 355, 0, 5, 10],
+    "particle_count": [50, 50, 50, 51, 51],
+    "trail_length": [5, 5, 6, 6, 6]
+  },
+  "round_cases": [[50.5, 50], [51.5, 52], [52.5, 52], [5.5, 6], [-0.5, 0], [-1.5, -2]],
+  "visual_edit": {"id": "count-offset", "layer": "visual", "field": "particle_count", "operation": "interval_offset", "start_us": 0, "end_us": 1000000, "value": 0.5},
+  "visual_edited_count": [50, 50, 50, 52, 52],
+  "offset_extrema": {
+    "start_speed": 7.8, "end_speed": 7.0,
+    "edit": {"id": "extrema", "layer": "visual", "field": "particle_speed",
+      "operation": "interval_offset", "value": 0.5, "start_us": 400000, "end_us": 500000,
+      "transition_in_us": 400000, "transition_out_us": 0, "interpolation": "smootherstep"},
+    "witness_us": 300000, "expected_witness_speed": 8.0082421875
+  },
+  "visual_validation_required_times": [0, 1, 499999, 500000, 500001, 999999, 1000000],
+  "invalid_patches": [
+    {"interpolation": "cubic"}, {"start_us": -1}, {"value": 1.1},
+    {"transition_in_us": 400001}, {"transition_out_us": 400001}, {"enabled": 1}
+  ]
+}

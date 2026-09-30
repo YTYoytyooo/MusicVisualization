@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MusicVisualization Studio · 音乐可视化工作台</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar"><div><span class="brand-mark">MV</span><strong>MusicVisualization <span>Studio</span></strong></div><span class="local-label">本地工作台 · 音乐不上传</span></header>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="section-heading"><h2>音乐项目</h2><button id="refresh-projects" class="quiet">刷新</button></div>
+      <label class="project-search">查找项目<input id="project-search" type="search" placeholder="搜索项目名称…" autocomplete="off"></label>
+      <nav id="project-list" aria-label="音乐项目"><p class="muted">正在连接本地服务…</p></nav>
+      <details class="new-project" open><summary>＋ 新建分析项目</summary>
+        <form id="create-form">
+          <label>项目名称<input name="name" placeholder="可选，例如 Happy Adventure"></label>
+          <label>音乐完整路径<input name="audio_path" required placeholder="D:\音乐\song.mp3" autocomplete="off"></label>
+          <label>模型完整路径<input name="model_path" required placeholder="D:\模型\emotion_model.pth" autocomplete="off"></label>
+          <label>随机种子<input name="seed" type="number" value="42" min="0" step="1" required></label>
+          <button type="submit" class="primary">建立项目并分析</button>
+          <p class="hint">首次分析可能较慢。完成后再手动生成视频；不会自动训练模型。</p>
+        </form>
+      </details>
+      <p class="sidebar-foot">原始预测只读 · 修订独立保存<br>人工修订不代表模型准确率提高</p>
+    </aside>
+    <main>
+      <nav class="workflow" aria-label="工作流程"><span><b>01</b> 导入音乐</span><span><b>02</b> 分析与规划</span><span><b>03</b> 调整数值</span><span><b>04</b> 预览与导出</span></nav>
+      <section class="project-header"><div><p class="eyebrow">EDITABLE MUSIC VISUALIZATION</p><h1 id="project-title">选择或建立一个音乐项目</h1><p id="project-meta" class="muted">一次分析，反复调整。每个输出都保留自己的修订版本。</p></div><div class="revision-controls"><label>查看修订<select id="revision-select" disabled></select></label><span id="draft-state" class="badge">尚未选择项目</span></div></section>
+      <div id="editor" class="editor disabled" aria-disabled="true" aria-busy="false" inert>
+        <div class="center-column">
+          <section class="card media-card"><div class="section-heading"><h2>视频 / 音频预览</h2><select id="render-select" aria-label="选择已生成的视频"><option value="">尚无生成视频</option></select></div>
+            <div class="video-stage"><video id="video" controls preload="metadata" hidden></video><div id="video-empty"><div class="empty-symbol">♫</div><h3>让音乐成为可编辑的画面</h3><p>先调整曲线，再保存修订并生成视频。</p><p class="hint">曲线预览即时更新；已有视频不会随草稿自动变化。</p></div></div>
+            <p id="video-version" class="video-version">没有已生成视频</p>
+            <div class="comparison-controls"><label class="check-label"><input id="compare-enabled" type="checkbox">与已有原版 / 参考视频同步对比</label><select id="compare-render" aria-label="选择原版参考视频"><option value="">选择已有参考视频</option></select></div>
+            <div id="comparison-panel" hidden><p class="eyebrow">REFERENCE · 原版 / 参考画面</p><video id="compare-video" preload="metadata" muted></video><div class="comparison-controls"><button id="compare-play" class="quiet">同步播放</button><button id="compare-pause" class="quiet">暂停两侧</button><label>声音来自<select id="compare-sound"><option value="modified">修改版（上方）</option><option value="reference">参考版（下方）</option></select></label></div><p id="compare-status" class="hint">请选择已生成的参考视频；按歌曲绝对时间同步，仅播放一侧声音。</p></div>
+            <audio id="audio" controls preload="metadata"></audio>
+            <div class="transport"><label>当前时间（秒）<input id="playhead" type="number" min="0" step="0.001" value="0"></label><span id="clock">00:00.000</span><button id="use-playhead" class="quiet">将此时间填入编辑器</button></div>
+          </section>
+          <section class="card timeline-card"><div class="section-heading"><h2>情绪时间线</h2><div class="legend"><span class="raw">原始预测</span><span id="baseline-legend" class="baseline" hidden>平滑基线</span><span class="effective">生效修订</span></div></div>
+            <div class="timeline-tools" role="toolbar" aria-label="时间线视图"><button id="zoom-in" class="quiet" title="围绕播放头放大">＋ 放大</button><button id="zoom-out" class="quiet">− 缩小</button><button id="pan-left" class="quiet" aria-label="向前平移">←</button><button id="pan-right" class="quiet" aria-label="向后平移">→</button><button id="locate-edit" class="quiet">定位修改</button><button id="view-full" class="quiet">返回全曲</button><label class="check-label"><input id="axis-lock" type="checkbox">锁定纵轴</label></div>
+            <div class="view-range"><label>可见起点（秒）<input id="view-start" type="number" min="0" step="0.1" value="0"></label><label>可见终点（秒）<input id="view-end" type="number" min="0" step="0.1"></label><button id="view-apply" class="quiet">定位范围</button><span id="viewport-state" class="hint">全曲视图</span></div>
+            <p class="hint">缩放与平移仅改变视图，不改动音乐或数值。点击波形跳转；拖动黄色关键帧调整时间与目标值，松开后校验。也可在右侧精确输入。</p><canvas id="waveform" height="76" aria-label="音频波形，点击跳转"></canvas><p class="hint">原始与修订共用刻度。已校验草稿自动保存到本机；重新打开可选择恢复。</p><canvas id="timeline" height="310" aria-label="Valence 和 Arousal 时间曲线，拖动黄色关键帧编辑"></canvas><div id="point-values" class="point-values">V —　A —</div></section>
+          <section class="card"><div class="section-heading"><h2>人工修改记录</h2><div class="history-toolbar" role="toolbar" aria-label="草稿历史"><button id="undo-draft" class="quiet" disabled title="撤销：Ctrl/Cmd+Z（输入框外）">↶ 撤销</button><button id="redo-draft" class="quiet" disabled title="重做：Ctrl/Cmd+Shift+Z 或 Ctrl+Y（输入框外）">↷ 重做</button><button id="reset-draft" class="quiet">恢复当前修订</button></div></div><p id="history-state" class="hint" aria-live="polite">最多保留 50 步已校验操作；切换项目或修订后清空。</p><div id="edits-list" class="edits-list"><p class="muted">没有人工修改，保留模型原始预测。</p></div></section>
+          <section class="card visual-card"><div class="section-heading"><h2>视觉参数时间线</h2><select id="visual-field" aria-label="视觉曲线字段"></select></div><p id="visual-plan-state" class="hint">选择视觉字段后计算真实 MCTS 规划基线；准备前不显示模拟数据。</p><canvas id="visual-timeline" height="190" aria-label="真实视觉规划与人工修订曲线"></canvas><p class="hint">灰线：自动规划基线；绿线：人工修订结果。情绪临时变化时，旧基线不用于预测新的视觉曲线。</p></section>
+          <section class="card motion-card"><div class="section-heading"><h2>粒子运动轨道</h2><span class="mini-tag">独立运动层</span></div><p id="motion-plan-state" class="hint" role="status">旧引擎 · 不改变已有运动。</p><canvas id="motion-timeline" height="150" aria-label="自动与生效运动轨道，点击跳转歌曲时间"></canvas><div id="motion-frame" class="motion-frame">选择多模式引擎后显示真实运动规划。</div><div id="motion-overrides" class="edits-list"></div><p class="hint">上轨为自动模式，下轨为人工覆盖后的模式；混合段显示多个模式权重。轨道与数值即时反馈，不是实时视频渲染。</p></section>
+        </div>
+        <aside class="inspector">
+          <section class="card motion-inspector"><h2>运动形态与区间覆盖</h2><form id="motion-form">
+            <label>运动引擎<select id="motion-engine"><option value="legacy">旧引擎 · 保持原效果</option><option value="flow-v1">多模式 · 情绪驱动</option></select></label>
+            <p class="hint">flow-v1 接管粒子速度、方向、湍流与拖尾；旧视觉参数中的颜色、亮度和粒子数量继续生效，运动请在本面板调整。</p>
+            <div class="field-row"><label>自动敏感度<input id="motion-sensitivity" type="number" min="0.5" max="2" step="0.1" value="1"></label><label>最短保持（秒）<input id="motion-hold" type="number" min="4" max="12" step="0.5" value="6"></label></div>
+            <label>自动过渡（秒）<input id="motion-transition" type="number" min="1" max="4" step="0.1" value="2"></label>
+            <p class="hint">自动设置与 V/A 变化后需要重新确认运动规划，不会重新运行视觉 MCTS。</p>
+            <button id="motion-new" class="quiet" type="button">＋ 添加运动区间</button>
+            <fieldset id="motion-override-fields" hidden><legend>人工运动区间</legend>
+              <label>运动模式<select id="motion-mode"></select></label>
+              <p class="hint">切换模式会恢复该模式的全部预设参数（包括方向）；随后仍可精细调整。</p>
+              <div class="field-row"><label>开始（秒）<input id="motion-start" type="number" min="0" step="0.001" value="2"></label><label>结束（秒）<input id="motion-end" type="number" min="0" step="0.001" value="4"></label></div>
+              <div class="field-row"><label>进入过渡（秒）<input id="motion-in" type="number" min="0" step="0.1" value="2"></label><label>退出过渡（秒）<input id="motion-out" type="number" min="0" step="0.1" value="2"></label></div>
+              <label>过渡方式<select id="motion-interpolation"><option value="smootherstep">柔和 · smootherstep</option><option value="smoothstep">平滑 · smoothstep</option><option value="linear">线性 · linear</option></select></label>
+              <details><summary>精细运动参数（可选）</summary><p class="hint">留空使用模式预设。速度与半径按画面短边归一化，方向角：右 0°、下 90°、左 180°、上 270°。</p><div id="motion-params" class="motion-params"></div></details>
+              <label>说明<input id="motion-note" maxlength="500" placeholder="例如副歌进入螺旋运动"></label>
+            </fieldset>
+            <p id="motion-adjustment-state" class="hint" role="status" data-state="ready">就绪 · 输入即时更新运动轨道</p>
+            <button id="motion-confirm" class="secondary" type="submit">确认运动调整</button>
+            <button id="motion-cancel" class="quiet" type="button" hidden>取消本次运动调整（Esc）</button>
+            <button id="motion-end-edit" class="quiet" type="button" hidden>结束编辑此运动区间</button>
+          </form></section>
+          <section class="card smoothing-card"><div class="section-heading"><h2>可选 · 情绪平滑</h2><span class="mini-tag">默认关闭</span></div><label class="check-label"><input id="smoothing-enabled" type="checkbox">平滑模型预测中的短时抖动</label><div class="field-row smoothing-row"><label>窗口（秒）<input id="smoothing-window" type="number" min="0.1" max="5" step="0.1" value="0.5"></label><button id="apply-smoothing" class="quiet">应用配置</button></div><p id="smoothing-state" class="hint">未开启 · 原始预测始终保留，人工目标仍精确生效。</p></section>
+          <section class="card"><h2>添加数值修改</h2><p class="hint">V/A 修改影响自动规划；视觉参数在规划后应用。粒子拖尾与图表高亮时长不同。</p>
+            <form id="edit-form">
+              <div class="field-row"><label>调整层<select id="edit-layer"><option value="emotion">情绪层</option><option value="visual">视觉层</option></select></label><label>字段<select id="edit-field"></select></label></div>
+              <label>操作<select id="edit-operation"><option value="point_target">单点目标（带过渡）</option><option value="interval_set">区间固定</option><option value="interval_offset">区间偏移</option></select></label>
+              <div class="field-row"><label><span id="start-label">目标时间（秒）</span><input id="edit-start" type="number" min="0" step="0.001" value="0" required></label><label id="end-label" hidden>结束时间（秒）<input id="edit-end" type="number" min="0" step="0.001" value="1"></label></div>
+              <label>目标值 / 偏移量<input id="edit-value" type="number" step="any" value="0.5" required><span id="field-hint" class="hint"></span></label>
+              <div class="field-row"><label>进入过渡（秒）<input id="edit-in" type="number" min="0" step="0.1" value="1" required></label><label>退出过渡（秒）<input id="edit-out" type="number" min="0" step="0.1" value="1" required></label></div>
+              <label>过渡方式<select id="edit-interpolation"><option value="smootherstep">柔和 · smootherstep（新建默认）</option><option value="smoothstep">平滑 · smoothstep</option><option value="linear">线性 · linear（兼容旧记录）</option></select></label>
+              <label>修改理由<input id="edit-note" placeholder="例如：进入高潮，增加唤醒度" maxlength="500"></label>
+              <div class="adjustment-status"><p id="adjustment-state" role="status" aria-live="polite">就绪 · 输入时本地即时预览</p><p id="impact-range" class="hint">黄色浅色区域标出本次调整的影响范围。</p></div>
+              <p class="hint">每个输入框从聚焦到离开 / Enter 为一步；连续输入不会产生多个撤销步骤。Esc 取消当前调整。曲线立即变化，后台稍后校验；这不是实时视频渲染。</p>
+              <button id="apply-edit" type="submit" class="secondary">添加修改</button>
+              <button id="cancel-adjustment" type="button" class="quiet" hidden>取消当前调整（Esc）</button>
+              <button id="cancel-edit" type="button" class="quiet" hidden>结束编辑此条记录</button>
+            </form>
+          </section>
+          <section class="card"><h2>保存与输出</h2><button id="preview-edit" class="secondary full">生成局部预览快照</button><p class="hint">所选修改影响范围前后各扩展 2 秒；未选择时预览前 10 秒。冻结当前草稿，不创建正式修订。</p><button id="save-revision" class="primary full">保存为新修订</button><p class="hint">保存不会覆盖原始预测，也不会自动生成视频。</p>
+            <form id="render-form">
+              <label>输出模式<select name="mode"><option value="analysis">分析版 · 轨迹、数值与修订标记</option><option value="presentation">展示版 · 纯可视化</option></select></label>
+              <label>画面尺寸<select id="render-size"><option value="1280,720">1280 × 720 · 正式输出</option><option value="640,360">640 × 360 · 低分辨率预览</option></select></label>
+              <div class="field-row"><label>开始（秒）<input name="start" type="number" value="0" min="0" step="0.1" required></label><label>结束（秒）<input name="end" type="number" min="0" step="0.1" placeholder="留空至结尾"></label></div>
+              <button type="submit" class="secondary full">生成当前已保存版本</button>
+              <p class="hint">保持 30 FPS。片段生成会先推进前段状态，因此不会立即开始出帧。</p>
+            </form><div id="download-links" class="download-links"></div>
+          </section>
+        </aside>
+      </div>
+      <section class="card jobs-card"><div class="section-heading"><h2>后台任务</h2><div class="jobs-toolbar"><select id="jobs-scope" aria-label="任务项目筛选"><option value="current">当前项目</option><option value="all">所有项目</option></select><button id="jobs-more" class="quiet" hidden>显示更多</button></div></div><p id="jobs-summary" class="hint">默认显示最近 5 项及所有活动任务；本页可见时每 2 秒刷新。</p><p id="jobs-other-active" class="hint" role="status" hidden></p><div id="jobs-list"><p class="muted">尚无任务。</p></div></section>
+    </main>
+  </div>
+  <dialog id="job-log-dialog"><div class="section-heading"><h2>任务日志</h2><button id="close-log" class="quiet">关闭</button></div><pre id="job-log"></pre></dialog>
+  <script src="/timeline-math.js" defer></script>
+  <script src="/motion-math.js" defer></script>
+  <script src="/app.js" defer></script>
+</body>
+</html>

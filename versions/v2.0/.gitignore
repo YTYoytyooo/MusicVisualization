@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+projects/
+.runtime/
+.cache/
+validation-output/

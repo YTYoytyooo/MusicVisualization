@@ -1,0 +1,26 @@
+{
+  "engine": "flow-v1",
+  "sensitivity": 1.0,
+  "min_hold_seconds": 6.0,
+  "transition_seconds": 2.0,
+  "overrides": [
+    {
+      "id": "manual-orbit",
+      "enabled": true,
+      "mode": "orbit",
+      "start_us": 10000000,
+      "end_us": 16000000,
+      "transition_in_us": 2000000,
+      "transition_out_us": 2000000,
+      "interpolation": "smootherstep",
+      "note": "Requires audio at least 18 seconds long; edit times for your song.",
+      "params": {
+        "speed": 0.13,
+        "coherence": 0.98,
+        "turbulence": 0.03,
+        "radius": 0.3,
+        "trail_seconds": 1.4
+      }
+    }
+  ]
+}

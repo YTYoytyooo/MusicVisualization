@@ -30,8 +30,9 @@ def main():
         raise FileExistsError('Preview outputs exist; choose a new output directory.')
     duration, fps, sr = 4, 10, 22050
     times = np.arange(40) * 0.1
-    states = [dict(valence=float(np.sin(t * 1.8) * .8),
-                   arousal=float(np.cos(t * 1.2) * .7)) for t in times]
+    # Deliberately small changes demonstrate zoom without changing predictions.
+    states = [dict(valence=float(.16 + np.sin(t * 1.8) * .04),
+                   arousal=float(.34 + np.cos(t * 1.2) * .04)) for t in times]
     hud = PredictionOverlay('显示测试 / SYNTHETIC DATA (not a song prediction)',
                             duration, states)
     sample_times = np.arange(duration * sr) / sr
