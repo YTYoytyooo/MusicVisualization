@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>音乐情绪 · 人工标注</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><div><span class="logo">VA</span><strong>音乐情绪标注</strong><span class="pill">下一版 · 人工数据</span></div><span class="local">本地保存 · 不训练模型</span></header>
+<div id="notice" role="status" aria-live="polite" hidden></div>
+<div class="layout">
+  <aside>
+    <label>标注者代号<input id="reviewer" value="me" maxlength="40" autocomplete="off" placeholder="例如 listener_01"></label>
+    <p class="hint">多人标注请分别使用代号，互不覆盖。</p>
+    <div class="row"><h2>音乐库</h2><button id="reload" class="small">刷新进度</button></div>
+    <div id="drop-zone" tabindex="0" role="button" aria-label="拖入音乐或点击添加"><strong>＋ 拖入音乐</strong><span>或点击选择 · 支持多首</span><small>MP3 / WAV / FLAC / OGG / M4A / AAC</small></div>
+    <input id="audio-files" type="file" accept=".mp3,.wav,.flac,.ogg,.m4a,.aac" multiple hidden>
+    <p id="import-status" class="hint" role="status"></p>
+    <input id="search" type="search" placeholder="搜索文件名…" aria-label="搜索音乐">
+    <select id="library-filter" aria-label="筛选标注状态"><option value="all">全部音乐</option><option value="unfinished">未完成</option><option value="complete">已完成</option></select><p id="library-summary" class="hint"></p>
+    <nav id="library" aria-label="音乐列表"></nav>
+    <details class="guide"><summary>怎样标才有用？</summary>
+      <p>以整首歌为单位，边听边移动情绪点。记录的是音乐表达的情绪，不是个人喜好。</p>
+      <p>选择仅效价、仅唤醒或两者，再选择相应数值（把握程度可稍后补填），再开始记录；没有变化时保持坐标即可。不确定时勾选“不确定”，不以 0 代替。</p>
+      <p>明显转折单独打点，可以暂停后精确修改时间。暂停、跳转或切到后台会结束记录，继续时手动开始。</p>
+      <p>空格开始/暂停记录（输入文字时除外）。重标覆盖所选维度的重叠时间范围，其他维度和时间范围保留。旧版分段标注仍保留在原目录。</p>
+    </details>
+  </aside>
+  <main>
+    <div id="empty"><p class="eyebrow">LISTEN · DECIDE · SAVE</p><h1>听见变化，记录感受</h1><p>从左侧选择一首音乐。这里不会显示模型预测，所有数值由你明确选择。</p><p>可以直接把音乐文件拖入左侧音乐库。所有音乐和标注只保存在本机。</p></div>
+    <section id="workspace" hidden>
+      <div class="song-heading"><div><p class="eyebrow">标注对象：音乐表达的情绪</p><h1 id="song-name"></h1></div><span id="save-state" class="pill">未保存</span></div>
+      <div class="metadata"><label>艺术家 / 作曲者（可选）<input id="artist" maxlength="200" placeholder="帮助后续分组评估"></label><label>风格（可选）<input id="style" maxlength="200" placeholder="例如 流行 / 电子 / 器乐"></label></div>
+      <div class="player-card transport"><audio id="audio" controls preload="metadata"></audio>
+        <div class="row wrap"><fieldset id="axis-mode" class="axis-options" aria-label="本次标注维度"><button type="button" data-mode="both" aria-pressed="true">效价 + 唤醒</button><button type="button" data-mode="valence" aria-pressed="false">仅效价 V</button><button type="button" data-mode="arousal" aria-pressed="false">仅唤醒 A</button></fieldset><button id="record" class="primary">开始标注（空格）</button><button id="mark">明显转折（M）</button><button id="replay">复核回放</button><span id="media-time">0:00</span></div>
+      </div>
+      <div class="timeline-toolbar"><button id="zoom-in" title="放大时间轴">＋ 放大</button><button id="zoom-out" title="缩小时间轴">－ 缩小</button><button id="zoom-reset">全曲</button><span id="time-window"></span></div>
+      <h2>时间轴 <span class="hint">绿色：V 愉悦度 · 橙色：A 激烈程度 · 虚线：独立转折</span></h2>
+      <canvas id="timeline" width="1100" height="180" aria-label="整首歌情绪曲线与转折时间轴"></canvas>
+      <div id="markers" class="marker-chips"></div>
+      <fieldset id="editor">
+        <div class="rating-grid">
+          <div>
+            <div class="va-plane" id="va-plane" role="button" tabindex="0" aria-label="二维情绪板；也可使用右侧的数值按钮选择">
+              <span class="quadrant q1">紧张 · 激烈</span><span class="quadrant q2">兴奋 · 明快</span><span class="quadrant q3">低落 · 沉静</span><span class="quadrant q4">舒适 · 平和</span><span id="point" hidden></span><span class="axis y">激烈 ↑</span><span class="axis x">愉悦 →</span>
+            </div><p class="hint">按住并拖动二维板连续调整两项。词语只作坐标参考，并非固定音乐类别。</p>
+          </div>
+          <div class="ratings">
+            <div class="rating"><div class="row"><h3>效价 Valence</h3><output id="v-value">尚未选择</output></div><p>负面、忧伤 ← 中性 → 正面、愉悦</p><input id="valence" type="range" min="-1" max="1" step="0.05" value="0" aria-label="愉悦度"><div class="anchors" data-axis="valence"><button data-value="-1">−1</button><button data-value="-0.5">−0.5</button><button data-value="0">0 中性</button><button data-value="0.5">+0.5</button><button data-value="1">+1</button></div></div>
+            <div class="rating"><div class="row"><h3>唤醒度 Arousal</h3><output id="a-value">尚未选择</output></div><p>平静、低唤醒 ← 中等 → 激动、高唤醒</p><input id="arousal" type="range" min="-1" max="1" step="0.05" value="0" aria-label="激烈程度"><div class="anchors" data-axis="arousal"><button data-value="-1">−1</button><button data-value="-0.5">−0.5</button><button data-value="0">0 中等</button><button data-value="0.5">+0.5</button><button data-value="1">+1</button></div></div>
+            <p class="hint">滑杆初始位置不算标签；所选维度需要主动选择。激烈不等于开心，音量大也不一定更激烈。</p>
+          </div>
+        </div>
+        <div class="metadata"><label>本次记录的把握程度（可选）<select id="confidence"><option value="">暂不评估 · 可稍后调整</option><option value="high">高 · 判断清楚</option><option value="medium">中 · 大致确定</option><option value="low">低 · 留待复核</option></select></label><label class="inline"><input id="uncertain" type="checkbox">当前不确定（记录空值）</label></div>
+        <label>整首备注<textarea id="note" rows="2" maxlength="2000"></textarea></label>
+      <details class="annotation-settings"><summary>把握程度与完成状态 <span id="review-summary" class="hint"></span></summary>
+        <div class="review-controls"><label>调整维度<select id="review-axis"><option value="both">效价 + 唤醒</option><option value="valence">仅效价 V</option><option value="arousal">仅唤醒 A</option></select></label>
+        <label>开始（秒）<input id="review-start" type="number" min="0" step="0.1" value="0"></label><label>结束（秒）<input id="review-end" type="number" min="0" step="0.1"></label>
+        <label>把握程度<select id="review-confidence"><option value="">暂不评估</option><option value="high">高 · 判断清楚</option><option value="medium">中 · 大致确定</option><option value="low">低 · 留待复核</option></select></label><button id="apply-confidence">应用并保存</button></div>
+        <div class="completion"><label class="inline"><input type="checkbox" id="complete-valence">效价已完成</label><label class="inline"><input type="checkbox" id="complete-arousal">唤醒已完成</label><span class="hint">由你确认完成，可随时取消；重标该维度会恢复为进行中。</span></div>
+      </details>
+      </fieldset>
+      <details><summary>当前有效曲线（重标后仅保留最新内容）</summary><div id="takes"></div></details>
+      <footer><div><strong>人工标注独立保存</strong><p id="output-location" class="hint"></p></div><button id="save">保存进度</button></footer>
+    </section>
+    <section class="export"><div><h2>导出当前标注者的数据</h2><p class="hint">仅导出已保存内容。有效 CSV 只含高 / 中把握的明确标注；全量包含未评估、不确定和低把握；两种 CSV 均含独立转折行。不会执行训练。</p></div><div class="row wrap"><button data-export="valid">有效标注 CSV</button><button data-export="all">全部记录 CSV</button><button data-export="json">完整 JSON</button></div></section>
+  </main>
+</div><dialog id="marker-dialog"><form method="dialog"><h2>转折点</h2><label>时间（秒）<input id="marker-time" type="number" step="0.01" min="0"></label><label>备注<input id="marker-note" maxlength="2000"></label><div class="actions"><button id="marker-apply" type="button" class="primary">保存修改</button><button id="marker-delete" type="button">删除此点</button><button>关闭</button></div></form></dialog><script src="/app.js"></script></body></html>

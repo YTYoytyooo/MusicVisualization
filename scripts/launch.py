@@ -1,6 +1,7 @@
 """Select an existing usable Python; never install or modify environments."""
 from pathlib import Path
 import os
+import shutil
 import subprocess
 import sys
 
@@ -28,7 +29,17 @@ def main():
         if version == 'v2.0' and not args:
             args = ['serve']
             print('Studio: http://127.0.0.1:8765', flush=True)
-        return subprocess.call([candidate, str(ROOT/'versions'/version/'main.py'), *args])
+        child_env = os.environ.copy()
+        paths = [str(Path(candidate).resolve().parent), child_env.get('PATH', '')]
+        encoder = ROOT/'versions/v2.0/.runtime/bin/ffmpeg.exe'
+        if not shutil.which('ffmpeg') and encoder.is_file():
+            paths.insert(0, str(encoder.parent))
+        child_env['PATH'] = os.pathsep.join(paths)
+        # Both versions reuse the prepared CLAP cache; honor user overrides.
+        clap_cache = ROOT/'versions/v2.0/.runtime/huggingface/hub'
+        if clap_cache.is_dir() and not child_env.get('HF_HOME'):
+            child_env.setdefault('HF_HUB_CACHE', str(clap_cache))
+        return subprocess.call([candidate, str(ROOT/'versions'/version/'main.py'), *args], env=child_env)
     print('No usable Python environment with the music dependencies was found.')
     print('Check venv/Scripts/python.exe, or set MUSIC_PYTHON to a prepared Python executable.')
     print('See README.md for environment setup and version entry points.')

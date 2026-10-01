@@ -83,6 +83,8 @@ python versions/v2.0/main.py render 'data/v2.0/projects/p-实际ID' --revision r
 
 ## 验证与维护
 
+人工数据标注：双击根目录 **Start Annotation.cmd**，访问 http://127.0.0.1:8766 。工具只收集下一版的整首连续 V/A 标注与独立转折点，保存到 `data/annotations/continuous`；不会训练或覆盖现有模型。操作与标注标准见 [标注工具说明](tools/annotate/README.md)。
+
 在有完整依赖的环境中，从相应版本目录运行原有测试。
 
 ```powershell
@@ -99,6 +101,8 @@ node scripts/check_motion_math.cjs
 ## 本次整理的验证范围
 
 本地数据迁移校验、旧项目与修订读取、历史媒体接口、临时副本修订保存、Python/JavaScript 语法及前端数学检查通过。选取的 31 项 Python 测试中 29 项通过，2 项因验证环境缺少 soundfile 失败；存储测试也被该依赖阻塞。
-整理机器的原 venv 失效，本次未重建环境，因此尚未重新验证完整模型推理和视频生成。历史验收文档不代表本次运行结果。
+以上是目录整理当时的结果。后续本地环境修复（2026-09-30）已将原 venv 连接到已安装的 Python 3.13.15，并复用原依赖；主要依赖导入、pip check 和 19 项相关测试通过。
+CLAP 模型已准备到本地缓存；使用真实音乐的 2 秒片段，1.0 完成 1280×720/30 FPS 视频生成，2.0 完成 CLAP 分析、五维预测和 flow-v1 的 320×180/10 FPS 视频生成，两份输出均通过音视频解码检查。Studio 启动入口及 HTTP 接口也通过检查。长歌曲与全部编辑功能不在此次短流程验证范围。
+启动器自动为两个版本配置已有本地 FFmpeg 和 CLAP 缓存，不改变系统环境变量。缓存、venv 和模型仍不包含在 GitHub 仓库中。
 
 本地迁移备份与记录保留在 `archive/`，不上传到 GitHub。

@@ -1,0 +1,61 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const {chromium}=require(process.env.STUDIO_PLAYWRIGHT||'playwright');
+(async()=>{
+ const browser=await chromium.launch({headless:true,executablePath:process.env.EDGE_PATH||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
+ const page=await browser.newPage({viewport:{width:1440,height:1080}});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+ const doc=()=>page.evaluate(async()=>{const lib=await(await fetch('/api/library')).json();return await(await fetch('/api/song/'+lib.songs[0].id)).json();});
+ const saved=()=>page.waitForFunction(()=>document.querySelector('#save-state').textContent.includes('已保存 r'));
+ const seek=async t=>{await page.locator('#audio').evaluate((a,t)=>a.currentTime=t,t);await page.waitForFunction(()=>!document.querySelector('#audio').seeking);};
+ try{
+  await page.goto(process.env.ANNOTATION_URL);await page.locator('.song').first().click();await page.waitForFunction(()=>!document.querySelector('#editor').disabled);
+  await page.locator('#axis-mode [data-mode="valence"]').click();await page.locator('#record').click();await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('请选择当前'));
+  await page.locator('[data-axis="valence"] [data-value="0"]').click();assert.equal(await page.locator('#confidence').inputValue(),'');
+  await page.locator('#valence').focus();await page.keyboard.press('Space');await page.waitForFunction(()=>document.querySelector('#audio').currentTime>.6);
+  await page.keyboard.press('m');await page.waitForFunction(()=>document.querySelector('#audio').currentTime>1.1);await page.keyboard.press('Space');await saved();
+  let result=await doc();assert.equal(result.takes.length,1);assert.deepEqual(result.takes[0].axes,['valence']);assert.ok(result.takes[0].points.every(p=>p.valence===0&&p.arousal===null));assert.equal(result.transitions.length,1);assert.ok(result.takes[0].points.every(p=>p.confidence===''));assert.match(await page.locator('.song').first().textContent(),/把握待评估/);
+  await page.locator('#axis-mode [data-mode="arousal"]').click();await page.locator('[data-axis="arousal"] [data-value="0.5"]').click();await seek(0);
+  await page.locator('#arousal').focus();await page.keyboard.press('Space');await page.waitForFunction(()=>document.querySelector('#audio').currentTime>1.1);await page.keyboard.press('Space');await saved();
+  result=await doc();const arousalBefore=result.takes.filter(t=>t.axes[0]==='arousal');assert.ok(arousalBefore.length);assert.ok(result.takes.some(t=>t.axes[0]==='valence'));
+  await page.locator('#axis-mode [data-mode="valence"]').click();await page.locator('[data-axis="valence"] [data-value="-0.5"]').click();await seek(.3);
+  await page.locator('#record').click();await page.waitForFunction(()=>document.querySelector('#audio').currentTime>.8);assert.match(await page.locator('#record').textContent(),/暂停并保存/);await page.locator('#record').click();await saved();
+  result=await doc();assert.deepEqual(result.takes.filter(t=>t.axes[0]==='arousal'),arousalBefore);
+  const vs=result.takes.filter(t=>t.axes[0]==='valence'),fresh=vs.find(t=>t.points.every(p=>p.valence===-.5));assert.ok(fresh);const lo=fresh.points[0].time,hi=fresh.points.at(-1).time;
+  assert.ok(vs.some(t=>t.points.some(p=>p.valence===0)));assert.ok(vs.every(t=>t===fresh||t.points.every(p=>p.time<lo||p.time>hi)));
+  await page.locator('#note').fill('备注');await page.keyboard.press('Space');assert.equal(await page.locator('#note').inputValue(),'备注 ');assert.equal(await page.locator('#audio').evaluate(a=>a.paused),true);
+  await page.locator('#save').click();await saved();
+  const curvesBefore=(await doc()).takes;
+  await page.locator('.annotation-settings summary').click();await page.selectOption('#review-confidence','high');await page.locator('#apply-confidence').click();await saved();
+  result=await doc();assert.ok(result.takes.flatMap(t=>t.points).every(p=>p.confidence==='high'));
+  const withoutConfidence=ts=>ts.map(t=>({...t,points:t.points.map(({confidence,...p})=>p)}));assert.deepEqual(withoutConfidence(result.takes),withoutConfidence(curvesBefore));
+  await page.locator('#complete-valence').check();await saved();await page.locator('#complete-arousal').check();await saved();
+  assert.match(await page.locator('.song').first().textContent(),/✓ 已完成/);
+  // Exercise actual drop event and raw local HTTP import with the synthetic WAV.
+  await page.evaluate(async()=>{const lib=await(await fetch('/api/library')).json();const buffer=await(await fetch('/audio/'+lib.songs[0].id)).arrayBuffer();const data=new DataTransfer();data.items.add(new File([buffer],'拖入演示.wav',{type:'audio/wav'}));document.querySelector('#drop-zone').dispatchEvent(new DragEvent('drop',{bubbles:true,dataTransfer:data}));});
+  await page.waitForFunction(()=>document.querySelectorAll('.song').length===2&&document.querySelector('#import-status').textContent.includes('已导入 1 首'));
+  assert.match(await page.locator('.song').nth(1).textContent(),/待标注/);
+  await page.selectOption('#library-filter','complete');assert.equal(await page.locator('.song').count(),1);
+  await page.reload();await page.locator('.song').first().click();await page.waitForFunction(()=>!document.querySelector('#editor').disabled);
+  assert.equal(await page.locator('#markers button').count(),1);assert.ok(await page.locator('#complete-valence').isChecked());assert.ok(await page.locator('#complete-arousal').isChecked());assert.match(await page.locator('.song').first().textContent(),/✓ 已完成/);
+  assert.equal(await page.locator('#stop').count(),0);assert.equal(await page.locator('#timeline-pan,#counts,#record-state').count(),0);assert.equal(await page.locator('#axis-mode button[aria-pressed=true]').count(),1);assert.equal(await page.locator('#marker-kind').count(),0);assert.equal(await page.locator('.review-card').count(),0);
+  assert.ok((await page.locator('#va-plane').boundingBox()).width>=320);
+  assert.equal((await doc()).transitions[0].kind,undefined);
+  await page.locator('#zoom-in').click();assert.match(await page.locator('#time-window').textContent(),/0:02.5 — 0:07.5/);
+  const timeline=page.locator('#timeline');await timeline.scrollIntoViewIfNeeded();let box=await timeline.boundingBox();await page.mouse.move(box.x+box.width*.5,box.y+30);await page.mouse.wheel(0,-100);
+  await page.waitForFunction(()=>!document.querySelector('#time-window').textContent.includes('0:02.5 — 0:07.5'));
+  const oldWindow=await page.locator('#time-window').textContent();await page.mouse.move(box.x+box.width*.5,box.y+30);await page.mouse.down();await page.mouse.move(box.x+box.width*.4,box.y+30);await page.mouse.up();assert.notEqual(await page.locator('#time-window').textContent(),oldWindow);
+  await page.locator('#zoom-reset').click();assert.match(await page.locator('#time-window').textContent(),/0:00.0 — 0:10.0/);
+  // Replay reads saved annotations into the existing board without any revisions.
+  const beforeReplay=await doc();await seek(.4);await page.locator('#replay').click();
+  await page.waitForFunction(()=>document.querySelector('#v-value').textContent==='-0.50'&&document.querySelector('#a-value').textContent==='0.50');assert.equal(await page.locator('#point').isVisible(),true);
+  await page.locator('#replay').click();assert.equal(await page.locator('#audio').evaluate(a=>a.paused),true);
+  await seek(7);await page.waitForFunction(()=>document.querySelector('#point').hidden&&document.querySelector('#v-value').textContent==='此处未标注');assert.deepEqual(await doc(),beforeReplay);
+  await page.locator('#markers button').first().click();await page.locator('#marker-time').fill('0.7');await page.locator('#marker-note').fill('转折说明');await page.locator('#marker-apply').click();await page.waitForFunction(()=>!document.querySelector('#marker-dialog').open);assert.equal((await doc()).transitions[0].time,.7);
+  const downloading=page.waitForEvent('download');await page.locator('[data-export="valid"]').click();const download=await downloading;const csv=fs.readFileSync(await download.path(),'utf8');assert.ok(csv.includes(',axis'));assert.ok(csv.includes(',transition,'));assert.ok(csv.includes('arousal'));assert.ok(csv.includes('-0.5'));
+  await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:process.env.ANNOTATION_SCREENSHOT,fullPage:true});
+  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.scrollTo(0,0));assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
+  await page.screenshot({path:process.env.ANNOTATION_SCREENSHOT.replace('.png','-mobile.png'),fullPage:true});assert.deepEqual(errors,[]);
+  console.log('Browser passed: zoom/pan, toggle record, inline untyped markers, read-only board replay, optional/post-hoc confidence, drag/drop import, completion/filter/reload, independent V/A, space from slider/button, per-axis interval overwrite, preserved transitions, text input space, save/reload/export.');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});
