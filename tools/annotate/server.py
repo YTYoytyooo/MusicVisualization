@@ -72,7 +72,7 @@ class Store:
         self.audio_root = Path(audio_root).resolve()
         self.output = Path(output).resolve()
         if not self.audio_root.is_dir():
-            raise ValueError('音频目录不存在')
+            raise ValueError(f'音频目录不存在或不是文件夹：{self.audio_root}。请检查 --audio-dir 指定的路径')
         if self.output == self.audio_root or self.output.is_relative_to(self.audio_root):
             raise ValueError('标注输出目录不能放在音频目录内')
         self.output.mkdir(parents=True, exist_ok=True)
@@ -455,7 +455,12 @@ class ContinuousStore(Store):
         return stream.getvalue().encode('utf-8-sig')
 
 
-def make_server(audio_root=ROOT/'assets/audio', output=ROOT/'data/annotations/continuous', port=8766, mode='continuous'):
+def make_server(audio_root=None, output=ROOT/'data/annotations/continuous', port=8766, mode='continuous'):
+    # Git excludes user audio, so a fresh checkout starts with an empty library.
+    # Only create the default folder; an explicitly mistyped path must still fail.
+    if audio_root is None:
+        audio_root = ROOT/'assets/audio'
+        audio_root.mkdir(parents=True, exist_ok=True)
     store = (Store if mode == 'segments' else ContinuousStore)(audio_root, output)
     token = secrets.token_urlsafe(32)
 
@@ -582,7 +587,7 @@ def make_server(audio_root=ROOT/'assets/audio', output=ROOT/'data/annotations/co
 
 def main():
     parser = argparse.ArgumentParser(description='本地音乐情绪标注工具；音乐与标注不会上传')
-    parser.add_argument('--audio-dir', type=Path, default=ROOT/'assets/audio')
+    parser.add_argument('--audio-dir', type=Path, help='已有音频文件夹；不指定时自动创建并使用项目内 assets/audio')
     parser.add_argument('--output', type=Path, default=ROOT/'data/annotations/continuous')
     parser.add_argument('--port', type=int, default=8766)
     args = parser.parse_args()
@@ -590,6 +595,7 @@ def main():
     try:
         server = make_server(args.audio_dir, args.output, args.port)
         print(f'Annotation: http://127.0.0.1:{server.server_port}', flush=True)
+        print(f'Audio directory: {server.store.audio_root}', flush=True)
         print(f'Audio files: {len(server.store.files)} | Labels: {server.store.output}', flush=True)
         print('Keep this terminal open. Ctrl+C stops the server.', flush=True)
         server.serve_forever()
