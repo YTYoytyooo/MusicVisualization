@@ -1,0 +1,8 @@
+[
+  {
+    "song_id": 1952,
+    "audio_sha256": "d49022a6f35a3629f81a9f8c8389b0bb0d05e381336989e841a3a0348d08f4eb",
+    "reason": "Observed libsndfile/mpg123 decoder error: part2_3_length (1664) too large for available bit count (1504). FFmpeg strict decode passes, but this recording is excluded pending review of the decoder discrepancy. Source audio is preserved unchanged.",
+    "reviewed_date": "2026-10-02"
+  }
+]

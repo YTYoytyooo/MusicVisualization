@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>VM · V3 研究预览</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">跳到工作区</a>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="VM V3 研究预览首页"><span class="brand-symbol" aria-hidden="true">v<span>m</span></span><span class="brand-word">MUSIC / MOTION</span><span class="version">V3</span></a>
+    <div class="header-status"><span class="research-pill">研究预览 · 未晋级</span><span id="connection" class="connection" role="status">连接中</span></div>
+  </header>
+  <div class="shell">
+    <aside class="sidebar" aria-label="素材与项目">
+      <div class="sidebar-heading"><span class="eyebrow">WORKSPACE</span><span class="tiny-label">本地离线</span></div>
+      <section class="library-section" aria-labelledby="library-heading">
+        <div class="section-heading"><h2 id="library-heading">音频库</h2><span id="library-count" class="count">0</span></div>
+        <label class="search-field"><span class="sr-only">筛选音频文件</span><span aria-hidden="true">⌕</span><input id="library-search" type="search" placeholder="搜索已有音频…" autocomplete="off"></label>
+        <label class="sr-only" for="library-list">选择已有音频</label>
+        <select id="library-list" class="library-list" size="9" aria-describedby="library-note"></select>
+        <p id="library-note" class="microcopy">仅读取已登记音频。分析不会用于训练。</p>
+        <div id="selected-file" class="selected-file">选择一首音频开始</div>
+        <div class="analysis-options">
+          <label class="field-label" for="device">计算设备</label><select id="device"><option value="cuda">GPU / CUDA</option><option value="cpu">CPU</option></select>
+          <label class="checkbox-row"><input id="include-v2" type="checkbox"><span>同时计算旧 V2 对照<span class="field-hint">会增加分析时间</span></span></label>
+        </div>
+        <button id="analyze" class="button primary" disabled><span aria-hidden="true">＋</span> 创建分析项目</button>
+      </section>
+      <section class="projects-section" aria-labelledby="projects-heading">
+        <div class="section-heading"><h2 id="projects-heading">项目</h2><button id="refresh" class="text-button" type="button">刷新</button></div>
+        <div id="projects" class="project-list"><p class="empty-note">尚无项目</p></div>
+      </section>
+      <div class="sidebar-foot"><span class="mini-mark" aria-hidden="true">◈</span><p>整曲上下文分析<br><span>原始预测始终单独保存</span></p></div>
+    </aside>
+    <main id="workspace" class="workspace" tabindex="-1">
+      <div class="workspace-heading"><div><div class="eyebrow">CONTINUOUS EMOTION STUDIO</div><h1 id="project-title">听见变化，看见情绪</h1><p id="project-subtitle">选择已有音频，建立可追溯的连续情绪预览。</p></div><span id="project-status" class="status-tag">待选择</span></div>
+      <div id="notice" class="notice" role="alert" hidden></div>
+      <section id="job-panel" class="job-panel" aria-label="任务状态" hidden>
+        <div class="job-top"><div><strong id="job-title">准备分析</strong><span id="job-stage">等待任务</span></div><div class="job-actions"><button id="cancel-job" class="button small" hidden>取消任务</button><button id="resume-job" class="button small" hidden>恢复任务</button></div></div>
+        <progress id="job-progress" max="1" aria-label="任务进度"></progress><p id="job-detail" class="microcopy" aria-live="polite"></p>
+      </section>
+      <div class="preview-grid">
+        <section class="visual-card" aria-labelledby="visual-heading">
+          <div class="card-heading visual-heading"><h2 id="visual-heading">视觉预览</h2><span class="caption-tag">ART MAPPING / 艺术映射</span></div>
+          <div class="visual-stage"><canvas id="visual-canvas" aria-label="由效价、唤醒和声学能量驱动的粒子艺术预览"></canvas><div id="visual-empty" class="visual-empty"><div class="empty-orbit" aria-hidden="true"><i></i><i></i><i></i></div><strong>等待真实分析结果</strong><span>完成分析后，播放音频查看同步视觉</span></div><div class="visual-corner"><span id="visual-model">B01 等权集成</span><span id="visual-mode">原始预测映射</span></div></div>
+          <div class="transport"><audio id="audio" controls preload="metadata" aria-label="音频播放与时间定位"></audio><div class="loop-controls"><span id="time-label" class="time-label">00:00 / 00:00</span><button id="set-loop-a" class="icon-button" title="将当前位置设为循环起点" aria-label="设置循环起点 A" disabled>A</button><button id="set-loop-b" class="icon-button" title="将当前位置设为循环终点" aria-label="设置循环终点 B" disabled>B</button><button id="toggle-loop" class="loop-toggle" aria-pressed="false" disabled>循环关闭</button><span id="loop-label" class="microcopy">A — · B —</span></div></div>
+        </section>
+        <aside class="readout-card" aria-label="当前位置数值">
+          <div class="card-heading"><h2>当前时刻</h2><span id="sample-time" class="mono">00:00.0</span></div>
+          <div class="readout"><div class="readout-label"><span><i class="dot teal"></i>效价 V</span><span>负面 ↔ 正面</span></div><strong id="readout-v">—</strong><div class="bipolar-meter"><span id="meter-v"></span></div></div>
+          <div class="readout"><div class="readout-label"><span><i class="dot amber"></i>唤醒 A</span><span>平静 ↔ 激动</span></div><strong id="readout-a">—</strong><div class="bipolar-meter amber-meter"><span id="meter-a"></span></div></div>
+          <div class="acoustic-readouts"><div><span>能量 / RMS</span><strong id="readout-energy">— <small>dBFS</small></strong></div><div><span>明亮度 / 频谱重心</span><strong id="readout-centroid">— <small>Hz</small></strong></div></div>
+          <div class="disagreement"><span>三种子分歧标准差</span><strong id="readout-disagreement">V — / A —</strong><p>模型间差异，不是准确概率。</p></div>
+          <p class="readout-footnote">播放时线性插值；首尾采样点之外保持端点值，仅用于预览，不改写原始采样点。</p>
+        </aside>
+      </div>
+      <section class="curves-card" aria-labelledby="curves-heading">
+        <div class="card-heading curve-heading"><div><h2 id="curves-heading">连续情绪曲线</h2><p class="microcopy">同一真实时间轴 · V / A 固定范围 −1 至 +1</p></div><div class="display-controls"><fieldset class="segmented"><legend class="sr-only">曲线模式</legend><label><input type="radio" name="curve-mode" value="raw" checked><span>原始预测</span></label><label><input type="radio" name="curve-mode" value="display"><span>显示曲线</span></label></fieldset><label class="smoothing-label">平滑<select id="smoothing" disabled><option value="0">关闭</option><option value="0.5">0.5 秒</option><option value="1">1 秒</option><option value="2">2 秒</option></select></label></div></div>
+        <div class="legend-bar" aria-label="显示模型"><label class="model-toggle b01"><input type="checkbox" id="show-b01" checked><i></i>B01 <span id="b01-availability">未计算</span></label><label class="model-toggle b00"><input type="checkbox" id="show-b00" checked><i></i>B00 <span id="b00-availability">未计算</span></label><label class="model-toggle v2"><input type="checkbox" id="show-v2" checked><i></i>旧 V2 <span id="v2-availability">未计算</span></label><span id="curve-caption" class="microcopy">原始预测 · 未应用显示平滑</span></div>
+        <div class="chart-wrap"><canvas id="emotion-canvas" height="310" tabindex="0" role="img" aria-label="效价与唤醒曲线。点击定位播放，左右方向键移动一秒。"></canvas><div id="curves-empty" class="chart-empty">分析完成后显示真实预测曲线</div></div>
+        <div class="chart-footer"><span>点击曲线定位播放 · ← / → 微调 1 秒</span><span id="sample-count">0 个模型序列</span></div>
+      </section>
+      <section class="curves-card acoustic-card" aria-labelledby="acoustic-heading">
+        <div class="card-heading"><div><h2 id="acoustic-heading">可解释声学属性</h2><p class="microcopy">能量与明亮度由音频计算，使用各自单位。</p></div><span class="caption-tag">ACOUSTIC FEATURES</span></div>
+        <div class="chart-wrap"><canvas id="acoustic-canvas" height="228" tabindex="0" role="img" aria-label="RMS 能量和频谱重心曲线。点击定位播放，左右方向键移动一秒。"></canvas><div id="acoustic-empty" class="chart-empty">暂无声学数据</div></div>
+      </section>
+      <div class="bottom-grid">
+        <section class="export-card" aria-labelledby="export-heading">
+          <div class="card-heading"><h2 id="export-heading">导出结果</h2><span class="caption-tag">REPRODUCIBLE</span></div>
+          <div class="download-row"><a id="download-raw" class="button download disabled" aria-disabled="true">原始 CSV <span aria-hidden="true">↗</span></a><a id="download-display" class="button download disabled" aria-disabled="true">显示 CSV <span aria-hidden="true">↗</span></a><a id="download-bundle" class="button download disabled" aria-disabled="true">项目 JSON <span aria-hidden="true">↗</span></a></div>
+          <div class="video-export"><div><strong>短视频预览</strong><p class="microcopy">固定粒子映射 · 保留原音频 · 最长 30 秒</p></div><div class="range-fields"><label>起点 / 秒<input id="export-start" type="number" min="0" value="0" step="0.1" inputmode="decimal"></label><label>终点 / 秒<input id="export-end" type="number" min="0" value="15" step="0.1" inputmode="decimal"></label><button id="use-current" class="text-button" disabled>从当前位置</button></div><button id="export-video" class="button primary subtle" disabled>生成预览视频</button><a id="download-video" class="text-button" hidden>下载上次生成的视频 ↗</a><p id="export-note" class="microcopy">导出使用当前原始／显示曲线设置。</p><p class="microcopy">视频为无文字的粒子画面，数值另存 CSV。与网页采用相同映射，边缘与颜色呈现可能略有差异。</p></div>
+        </section>
+        <section class="provenance-card" aria-labelledby="provenance-heading">
+          <div class="card-heading"><h2 id="provenance-heading">模型与边界</h2><span class="caption-tag">RESEARCH ONLY</span></div>
+          <dl class="metadata"><div><dt>预测模型</dt><dd id="model-name">B01 · 三种子等权集成</dd></div><div><dt>分析模式</dt><dd>离线整曲 · 使用上下文</dd></div><div><dt>校准输出</dt><dd id="calibration-status">不可用 · 尚未通过审核</dd></div><div><dt>可靠性区间</dt><dd>不可用 · 不显示准确概率</dd></div><div><dt>紧张度</dt><dd>不可用 · 缺少真实监督</dd></div><div><dt>项目标识</dt><dd id="project-id" class="mono">—</dd></div></dl>
+          <p class="boundary-note">候选尚未通过全部逐库逐维门槛。预览、显示平滑和视觉效果不代表模型精度提升。最终测试集保持封存。</p>
+        </section>
+      </div>
+      <footer class="workspace-footer"><span>VM / V3 RESEARCH PREVIEW</span><span>本地结果 · 原版行为保留 · 不进行训练</span></footer>
+    </main>
+  </div>
+</body>
+</html>

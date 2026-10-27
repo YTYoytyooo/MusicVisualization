@@ -21,6 +21,8 @@ data/v1.0/cache/            1.0 CLAP 缓存，保留原素材子目录层级
 data/v2.0/projects/        Studio 项目、音频副本、预测、修订、缓存、视频、任务记录
 data/v2.0/outputs/         Studio 历史批量导出结果
 data/v2.0/validation-output/ 验证报告与产物
+data/datasets/deam/         DEAM 原始数据、连续标签、训练划分与审计报告
+tools/datasets/             下一版模型的数据准备与读取工具
 scripts/                   启动与整理验证工具
 venv/                      本地 Python 环境
 ```
@@ -84,6 +86,14 @@ python versions/v2.0/main.py render 'data/v2.0/projects/p-实际ID' --revision r
 ## 验证与维护
 
 人工数据标注：双击根目录 **Start Annotation.cmd**，访问 http://127.0.0.1:8766 。工具只收集下一版的整首连续 V/A 标注与独立转折点，保存到 `data/annotations/continuous`；不会训练或覆盖现有模型。操作与标注标准见 [标注工具说明](tools/annotate/README.md)。
+
+DEAM 训练数据已按原始数据与派生数据分开管理，保留连续 V/A 时间轴、缺失掩码及按歌手划分的训练/验证/测试集。它服务于下一版模型，不会自动接入或覆盖当前模型；读取方式和已知问题见 [数据准备说明](tools/datasets/README.md)，更多数据集见 [资源清单](tools/datasets/RESOURCES.md)。
+
+下一版独立训练入口见 [训练说明](tools/train_next/README.md)：先用 DEAM 真实标签训练 V/A 教师，保存到 `models/next_va`，使用独立 GPU 环境，不修改现有模型与运行环境。
+
+V3 独立制作工作台入口为根目录 `Start V3.cmd`，使用说明与验收范围见 [V3 工作台说明](versions/v3.0/README.md)。保留 V2 导入、情绪/视觉/运动编辑、草稿恢复和视频输出；模型仍处于研究状态，不能据工程优化宣称情绪精度超过 V2。仓库仅包含源码、文档及测试，音频、模型权重、本地环境、缓存和生成输出不上传；运行需要已有的本地资源。
+
+补充数据已接入独立准备流程：PMEmo、Memo2496 通过校验和跨库重复筛查后用于接续训练；MERP 的时间原点问题暂时隔离。具体路径、自动接续与恢复方式见 [补充数据说明](tools/datasets/SUPPLEMENTAL.md)。
 
 在有完整依赖的环境中，从相应版本目录运行原有测试。
 
