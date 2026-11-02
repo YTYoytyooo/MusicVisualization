@@ -222,7 +222,9 @@ def timeline_payload(path, edits=None, revision=None, smoothing=None, motion=Non
             'source_hold_last_to_end': bool(getattr(raw, 'hold_last_to_end', False)),
             'hold_last_to_end': bool(getattr(raw, 'hold_last_to_end', False)),
             'source_system': p.get('source_system'), 'raw_sha256': p['raw_sha256'],
-            'comparison_systems': systems_metadata(path, include_values=True), 'acoustic': acoustic,
+            # The project payload already carries status; comparison arrays
+            # only need values, so avoid re-reading the frozen evidence chain.
+            'comparison_systems': systems_metadata(path, include_values=True, include_status=False), 'acoustic': acoustic,
             'legacy_reference': legacy_reference(path, p),
             'baseline': _json_values(baseline_at(raw, ts, p['step_us'], smoothing)),
             'raw': _json_values(raw_at(raw, ts, p['step_us'])),

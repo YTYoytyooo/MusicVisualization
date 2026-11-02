@@ -175,7 +175,7 @@ def load_raw(path, verify=True, system=None):
     file = _contained_file(path, record['file'])
     if verify and digest(file) != record['raw_sha256']:
         raise ValueError('原始预测校验失败；拒绝继续生成')
-    with np.load(file, allow_pickle=False) as data:
+    with open(file, 'rb') as stream, np.load(stream, allow_pickle=False) as data:
         values = data['values'].copy()
         if p['schema_version'] == 1:
             values = values[:, :2]
@@ -184,14 +184,18 @@ def load_raw(path, verify=True, system=None):
     return TimedValues(values, clock, mask, record['step_us'], p['duration_us'], record.get('hold_last_to_end', False))
 
 
-def systems_metadata(path, include_values=False):
+def systems_metadata(path, include_values=False, include_status=True):
     p = _metadata(path)
     names = list(p['systems']) if p['schema_version'] == 2 else ['v2']
+    from .prediction_status import prediction_statuses
+    statuses = prediction_statuses(path, p, {name: _system(p, path, name)[1] for name in names}) if include_status else None
     result = []
     for name in names:
         _, record = _system(p, path, name)
         row = {k: record.get(k) for k in ('label', 'step_us', 'raw_sha256', 'model_sha256', 'model_path', 'alignment')}
         row['id'] = name
+        if statuses is not None:
+            row['prediction_status'] = statuses[name]
         row['hold_last_to_end'] = record.get('hold_last_to_end', False)
         if include_values:
             raw = load_raw(path, system=name)

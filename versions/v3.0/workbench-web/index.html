@@ -36,6 +36,7 @@
       <section class="project-header"><div><p class="eyebrow">EDITABLE MUSIC VISUALIZATION</p><h1 id="project-title">选择或建立一个音乐项目</h1><p id="project-meta" class="muted">一次分析，反复调整。每个输出都保留自己的修订版本。</p></div><div class="revision-controls"><label>查看修订<select id="revision-select" disabled></select></label><span id="draft-state" class="badge">尚未选择项目</span></div></section>
       <section class="card model-controls">
         <div class="model-driver"><label>作品驱动模型<select id="source-system" disabled></select></label><p id="driver-state" class="hint">此选择决定画面驱动和正式输出；对照曲线仅用于查看。</p></div>
+        <div id="prediction-status" class="prediction-status" role="status" aria-live="polite" aria-atomic="true"><strong id="prediction-status-title">预测状态待确认</strong><p id="prediction-status-detail">选择项目后显示此驱动模型的研究与校准状态。</p><p class="hint">原始预测只读；人工修改单独保存。显示平滑不等于校准，也不代表预测精度提高。</p></div>
         <details class="model-reference"><summary>原始曲线对照与模型说明</summary><fieldset><legend>显示原始对照曲线（不改变画面驱动）</legend><div id="comparison-systems" class="comparison-toggles"></div></fieldset><p class="hint">模型仍处于研究状态，制作功能补全不表示精度已超过 V2。紧张度没有独立监督；声学测量不当作情绪真值。</p></details>
       </section>
       <div id="editor" class="editor disabled" aria-disabled="true" aria-busy="false" inert>

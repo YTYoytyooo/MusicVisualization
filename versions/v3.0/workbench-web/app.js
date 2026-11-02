@@ -870,6 +870,18 @@
     }
     select.value=state.sourceSystem;
     $("driver-state").textContent="作品驱动："+state.sourceSystem+" · 每个修订单独保存；下方对照勾选仅影响显示。";
+    const status=systems.find(system=>system.id===state.sourceSystem)?.prediction_status;
+    const verified=status?.evidence==="verified_frozen_record";
+    let title="预测状态未确认",detail="缺少或无法核对该模型的状态凭证；不表示已验证或已校准。";
+    if(verified&&status.kind==="research"&&status.research==="not_promoted"&&status.calibration==="unavailable"){
+      title=(state.sourceSystem==="b00"?"研究对照":"研究候选")+" · 未获准替换默认模型";
+      detail=state.sourceSystem==="b00"?"当前为未校准的原始预测，仅供对照；不作为已验证的替换模型。":"当前为未校准的原始预测；尚未通过全部验证，不应视为已超过 V2。";
+    }else if(status?.kind==="legacy"){
+      title="历史模型 · 保留原有行为";
+      detail=verified&&status.calibration==="not_applied"?"当前为历史原始预测，未应用校准；不表示已通过新模型验证。":"研究与校准状态未记录或无法核对；不表示已通过新模型验证。";
+    }
+    $("prediction-status-title").textContent=title;
+    $("prediction-status-detail").textContent=detail;
   }
   function comparisonSources(){
     const values=state.data?.timeline?.comparison_systems||{};
