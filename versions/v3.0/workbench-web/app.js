@@ -463,6 +463,12 @@
         localStorage.removeItem(key); return;
       }
     } catch { invalid = true; }
+    const unchangedStoredDraft = () => {
+      if (localStorage.getItem(key) === stored) return true;
+      notice("本地草稿已在其他页面更新或移除，旧操作未执行。");
+      offerSavedDraft();
+      return false;
+    };
     const el = $("notice");
     el.replaceChildren(node("span", invalid
       ? "此修订的本地草稿无法读取。后台数据未被修改；可以丢弃损坏草稿后继续。"
@@ -471,18 +477,18 @@
     if (!invalid) {
       const restore = node("button", "恢复草稿");
       restore.onclick = run(async () => {
-        if (!currentContext()) return;
-        await applyDraft(draft.edits,"edit",draft.smoothing||{enabled:false,window_seconds:.5},draft.motion||defaultMotion());
+        if (!currentContext() || !unchangedStoredDraft()) return;
+        await applyDraft(draft.edits,"edit",draft.smoothing||{enabled:false,window_seconds:.5},draft.motion||defaultMotion(),{key,value:stored});
         notice("已恢复并校验本地草稿。请保存为新修订后生成视频。");
       });
       el.append(restore);
     }
     const discard = node("button", invalid ? "丢弃损坏草稿" : "丢弃本地草稿");
-    discard.onclick = () => {
-      if (!currentContext()) return;
+    discard.onclick = run(() => {
+      if (!currentContext() || !unchangedStoredDraft()) return;
       try { localStorage.removeItem(key); notice("已丢弃此浏览器中的草稿，后台修订未改动。"); }
       catch { notice("浏览器不允许清除存储。可以继续编辑并保存正式修订。", true); }
-    };
+    });
     el.append(discard);
   }
 
@@ -897,7 +903,17 @@
   }
   function dialogChoice(id,message){
     const dialog=$(id);if(message&&$("switch-message"))$("switch-message").textContent=message;
+    if(dialog.open)return Promise.resolve("cancel");
     return new Promise(resolve=>{dialog.returnValue="cancel";dialog.addEventListener("close",()=>resolve(dialog.returnValue||"cancel"),{once:true});dialog.showModal();});
+  }
+  async function confirmAction(title,message,acceptLabel){
+    if(!state.data||state.loading||state.busy||$("action-dialog").open)return false;
+    const serial=state.loadSerial,id=projectId(),revision=revisionId(),driver=state.sourceSystem;
+    $("action-title").textContent=title;$("action-message").textContent=message;
+    $("action-accept").textContent=acceptLabel;
+    const choice=await dialogChoice("action-dialog");
+    return choice==="accept"&&!state.loading&&!state.busy&&state.loadSerial===serial&&
+      projectId()===id&&revisionId()===revision&&state.sourceSystem===driver;
   }
   async function saveCurrentRevision(){
     await finishPending();
@@ -1311,7 +1327,7 @@
       list.append(row);
     }
   }
-  async function applyDraft(edits, historyAction = "edit", smoothing = state.smoothing,motion=state.motion) {
+  async function applyDraft(edits, historyAction = "edit", smoothing = state.smoothing,motion=state.motion,expectedStorage=null) {
     if (!state.data) throw new Error("请先选择项目。");
     if (state.loading || state.busy) throw new Error("正在载入或校验，请稍后重试。");
     const previous = clone(state.edits), next = clone(edits), serial = state.loadSerial;
@@ -1330,6 +1346,11 @@
       if (!transactionContext(context)) throw new Error("项目已切换，此次草稿操作未应用。");
       const preview = await api(projectRoute() + "/preview", { base_revision: revisionId(), edits: next });
       if (state.loading || serial !== state.loadSerial) throw new Error("项目已切换，此次草稿操作未应用。");
+      if(expectedStorage&&localStorage.getItem(expectedStorage.key)!==expectedStorage.value)
+        throw new Error("本地草稿已由其他页面更新，本次恢复未应用。请重新打开此项目后恢复最新草稿。");
+      // Compute before committing history or accepted edits: a failed preview
+      // must leave the previous accepted draft intact.
+      const nextPreview=localEmotion(next);
       if (JSON.stringify(previous) !== JSON.stringify(next) ||
           JSON.stringify(previousSmoothing)!==JSON.stringify(state.smoothing)||
           JSON.stringify(previousMotion)!==JSON.stringify(state.motion)) {
@@ -1346,7 +1367,7 @@
       }
       const oldEmotion = emotionSignature(state.edits);
       state.edits = next;
-      state.preview = state.confirmedPreview = localEmotion(next);
+      state.preview = state.confirmedPreview = nextPreview;
       if(preview.motion)adoptMotionPlan(preview.motion,next,state.motion);
       else scheduleMotionPlan(next,state.motion);
       if (plan) adoptVisualPlan(plan, next);
@@ -1984,7 +2005,7 @@
   $("preview-edit").onclick=run(async()=>{
     if(!state.data||state.loading||state.busy)return;
     await finishPending();
-    if(!confirm("将冻结当前草稿并生成局部预览视频，不改变已保存修订。继续吗？"))return;
+    if(!await confirmAction("生成局部预览", "将冻结当前草稿并生成局部预览视频，不改变已保存修订。", "生成预览"))return;
     state.busy=true;updateDraft();
     try {
       await api(projectRoute()+"/previews",{base_revision:revisionId(),edits:clone(state.edits),
@@ -2066,17 +2087,21 @@
     notice("本次调整已确认。保存为新修订后即可生成视频。");
   });
   $("reset-draft").onclick = run(async () => {
-    await finishPending();
-    if (!dirty() || confirm("放弃当前未保存的修改，恢复所选修订？")) {
-      await applyDraft(clone(state.data.revision.edits || []),"edit",state.savedSmoothing,state.savedMotion);
-      cancelEditing();
-    }
+    if(!state.data||state.loading||state.busy)return;
+    if(!dirty()&&!pending())return;
+    if(!await confirmAction("恢复所选修订", "放弃当前未保存和未确认的修改，恢复所选修订？原始预测和已保存修订保持不变，已确认的草稿可通过撤销找回。", "恢复修订"))return;
+    // Discard even invalid pending inputs, and invalidate their late responses.
+    // Requiring finishPending here prevented recovery from validation errors.
+    cancelAdjustment(true);
+    await applyDraft(clone(state.data.revision.edits || []),"edit",state.savedSmoothing,state.savedMotion);
+    cancelEditing();
+    notice("已恢复所选修订。原始预测与已保存修订未改动；可撤销恢复已确认的草稿。");
   });
   $("save-revision").onclick = run(async () => {
     if (!state.data || state.loading || state.busy ||
         (!dirty() && !pending() && revisionId() === state.data.project.current_revision)) return;
     if (revisionId() !== state.data.project.current_revision &&
-        !confirm("正在查看历史修订。保存将以这份草稿创建新的当前版本，不覆盖已有历史。继续吗？")) return;
+        !await confirmAction("从历史修订保存", "保存将以这份草稿创建新的当前版本，不覆盖已有历史。", "保存新修订")) return;
     await saveCurrentRevision();
   });
   $("render-form").onsubmit = run(async event => {

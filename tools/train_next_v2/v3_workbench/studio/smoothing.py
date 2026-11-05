@@ -56,7 +56,8 @@ def baseline_at(raw, times_us, step_us=100000, config=None):
         mask = source_mask(source)
         for column in (0, 1):
             use = ((t >= clock[index]) & (t < clock[right]) & joins[index]
-                   & mask[index, column] & mask[right, column])
+                   & mask[index, column] & mask[right, column]
+                   & np.isfinite(result[:, column]))
             ratio = (t[use]-clock[index[use]])/(clock[right[use]]-clock[index[use]])
             result[use, column] = source[index[use], column]*(1-ratio)+source[right[use], column]*ratio
             # Singleton runs and the final sample keep native held values.

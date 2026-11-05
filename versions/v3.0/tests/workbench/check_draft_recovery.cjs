@@ -22,7 +22,8 @@ function harness(){
   const state={data:{project:{id:"p",analysis_id:"a",current_revision:"r"},revision:{id:"r"}},sourceSystem:"b01",
     edits:plain(saved),saved:JSON.stringify(saved),smoothing:plain(smoothing),savedSmoothing:plain(smoothing),
     motion:plain(motion),savedMotion:plain(motion),busy:false,loading:false,loadSerial:1,
-    undoStack:[],redoStack:[],editingId:null,localFrame:null,tx:null,confirmQueue:[],finalizing:null,motionTx:null,motionFinal:null,motionFrame:null};
+    undoStack:[],redoStack:[],editingId:null,localFrame:null,tx:null,confirmQueue:[],finalizing:null,motionTx:null,motionFinal:null,motionFrame:null,
+    preview:{edits:plain(saved)},confirmedPreview:{edits:plain(saved)}};
   const storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
   const c={state,StudioWorkbenchState:S,localStorage:storage,$:get,node,clone:plain,Date,JSON,HISTORY_LIMIT:50,
     crypto:{randomUUID:()=>"recovery-test"},defaultMotion:()=>({engine:"legacy",sensitivity:1,min_hold_seconds:6,transition_seconds:2,overrides:[]}),
@@ -44,6 +45,10 @@ function harness(){
   return {c,state,values,key,storage,notices,requests,events,payload,offer,button,get};
 }
 async function test(name,run){try{await run();checks.push({name,passed:true});}catch(error){checks.push({name,passed:false,error:error.stack});}}
+function acceptedState(h){
+  return plain(Object.fromEntries(["edits","saved","smoothing","savedSmoothing","motion","savedMotion","undoStack","redoStack",
+    "preview","confirmedPreview","editingId","sourceSystem","data"].map(key=>[key,h.state[key]])));
+}
 (async()=>{
   await test("accepted draft restores edits, smoothing and independent motion after server validation",async()=>{
     const h=harness(),draft=h.payload();h.offer(draft);await h.button("恢复草稿").onclick();
@@ -75,6 +80,41 @@ async function test(name,run){try{await run();checks.push({name,passed:true});}c
     await h.button("恢复草稿").onclick();assert.equal(h.values.get(h.key),before);
     assert.deepEqual(plain(h.state.edits),saved);assert.deepEqual(plain(h.state.smoothing),smoothing);assert.deepEqual(plain(h.state.motion),motion);
     assert.equal(h.state.undoStack.length,0);assert.equal(h.state.busy,false);assert.equal(h.notices.at(-1).error,true);
+    assert.equal(h.notices.some(x=>x.text.includes("已恢复并校验")),false);
+  });
+  await test("local preview failure after server acceptance leaves the entire accepted draft and history intact",async()=>{
+    const h=harness();h.offer();const before=acceptedState(h),stored=h.values.get(h.key),localEmotion=h.c.localEmotion;
+    h.c.localEmotion=()=>{throw Error("local preview computation failed");};
+    await h.button("恢复草稿").onclick();
+    assert.equal(h.requests.length,1,"the failure must be after server acceptance");
+    assert.deepEqual(acceptedState(h),before);assert.equal(h.values.get(h.key),stored);
+    assert.equal(h.state.busy,false);assert.equal(h.notices.at(-1).error,true);
+    assert.equal(h.notices.some(x=>x.text.includes("已恢复并校验")),false);
+    // The failed attempt must not poison a subsequent recovery.
+    h.c.localEmotion=localEmotion;h.c.offerSavedDraft();await h.button("恢复草稿").onclick();
+    assert.deepEqual(plain(h.state.edits),h.payload().edits);assert.equal(h.state.undoStack.length,1);
+  });
+  for(const action of ["恢复草稿","丢弃本地草稿"]){
+    await test("old "+action+" action cannot overwrite or remove a newer stored draft",async()=>{
+      const h=harness();h.offer();const button=h.button(action),before=acceptedState(h);
+      const newer=h.payload();newer.edits[0].value=.8;const stored=JSON.stringify(newer);h.values.set(h.key,stored);
+      await button.onclick();
+      assert.equal(h.values.get(h.key),stored);assert.deepEqual(acceptedState(h),before);assert.equal(h.requests.length,0);
+      // The refreshed prompt can explicitly recover the newer version.
+      assert.ok(h.button("恢复草稿"));await h.button("恢复草稿").onclick();
+      assert.deepEqual(plain(h.state.edits),newer.edits);assert.equal(h.state.undoStack.length,1);
+    });
+  }
+  await test("a newer stored draft arriving during server validation is never overwritten by recovery",async()=>{
+    const h=harness();h.offer();const before=acceptedState(h);let respond,entered;
+    const waiting=new Promise(resolve=>{respond=resolve;});
+    const started=new Promise(resolve=>{entered=resolve;});
+    h.c.api=async()=>{entered();await waiting;return {};};
+    const restoring=h.button("恢复草稿").onclick();await started;
+    const newer=h.payload();newer.edits[0].value=.8;const stored=JSON.stringify(newer);h.values.set(h.key,stored);
+    respond();await restoring;
+    assert.equal(h.values.get(h.key),stored);assert.deepEqual(acceptedState(h),before);
+    assert.equal(h.state.busy,false);assert.equal(h.notices.at(-1).error,true);
     assert.equal(h.notices.some(x=>x.text.includes("已恢复并校验")),false);
   });
   await test("old recovery and discard actions cannot touch a newly loaded project",async()=>{

@@ -119,6 +119,7 @@
   <dialog id="job-log-dialog"><div class="section-heading"><h2>任务日志</h2><button id="close-log" class="quiet">关闭</button></div><pre id="job-log"></pre></dialog>
   <dialog id="switch-dialog"><form method="dialog"><h2>当前作品有未保存修改</h2><p id="switch-message">先处理草稿，再切换项目或修订。</p><div class="dialog-actions"><button value="save" class="primary">保存为新修订并继续</button><button value="keep" class="secondary">保留本地草稿并继续</button><button value="cancel" class="quiet" autofocus>取消切换</button></div></form></dialog>
   <dialog id="driver-dialog"><form method="dialog"><h2>切换作品驱动模型</h2><p>新模型会改变制作基线。区间偏移依赖基线，保留修改时将重新校验，成功后保存为新修订。</p><div class="dialog-actions"><button value="retain" class="primary">保留人工修改并重新校验</button><button value="reset" class="secondary">使用新模型原始基线</button><button value="cancel" class="quiet" autofocus>取消切换</button></div></form></dialog>
+  <dialog id="action-dialog" aria-labelledby="action-title" aria-describedby="action-message"><form method="dialog"><h2 id="action-title">确认操作</h2><p id="action-message"></p><div class="dialog-actions"><button id="action-accept" value="accept" class="primary">继续</button><button value="cancel" class="quiet" autofocus>取消</button></div></form></dialog>
   <script src="/timeline-math.js" defer></script>
   <script src="/motion-math.js" defer></script>
   <script src="/workbench-state.js" defer></script>

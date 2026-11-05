@@ -58,7 +58,9 @@ def source_mask(raw):
 def connected(raw, step_us=100000):
     clock = source_clock(raw, step_us)
     step = getattr(raw, 'step_us', None) or step_us
-    return np.diff(clock) <= 1.5 * step
+    # A held observation expires after one native step (see raw_at). Even a
+    # shorter-than-one-sample hole must split smoothing/interpolation runs.
+    return np.diff(clock) <= step
 VISUAL_BOUNDS = {
     'hue_base': (0., 360.), 'hue_range': (20., 120.),
     'saturation': (.3, 1.), 'brightness': (.1, .9),

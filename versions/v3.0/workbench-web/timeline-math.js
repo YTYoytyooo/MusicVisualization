@@ -186,7 +186,9 @@
       if(index<0)return [null,null];
       const held=(holdLastToEnd&&index===times.length-1)||!(nominal && t-times[index]>nominal);
       const row=held?values[index].slice():[null,null];
-      if(!linear || index+1>=times.length || (nominal&&times[index+1]-times[index]>1.5*nominal))return row;
+      // Use the same validity span as rawAt. Smoothing cannot extend expired
+      // observations or borrow values from the far side of even a short gap.
+      if(!held || !linear || index+1>=times.length || (nominal&&times[index+1]-times[index]>nominal))return row;
       const alpha=clamp((t-times[index])/(times[index+1]-times[index]),0,1);
       // row is already a copy; interpolate there instead of allocating another
       // array per query. Never blend through a missing dimension.
@@ -217,7 +219,7 @@
         let start=0;
         while(start<raw.length){
           if(raw[start][c]===null){start++;continue;}
-          let end=start+1;while(end<raw.length&&raw[end][c]!==null&&(!nominal||stepUs[end]-stepUs[end-1]<=1.5*nominal))end++;
+          let end=start+1;while(end<raw.length&&raw[end][c]!==null&&(!nominal||stepUs[end]-stepUs[end-1]<=nominal))end++;
           const sums=[0];for(let i=start;i<end;i++)sums.push(sums[sums.length-1]+raw[i][c]);
           let lo=start,hi=start;
           for(let i=start;i<end;i++){
